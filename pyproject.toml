@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "welldash"
+version = "0.1.0"
+description = "A repository for a dash app to display well data and ml results for waterlevel prediction"
+readme = "README.md"
+requires-python = ">=3.12"
+dynamic = ["dependencies"]
+authors = [
+    {name = "Tomas Snyder", email = "tomassnyder45@gmail.com"}
+]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[project.urls]
+Homepage = "https://github.com/quasiStellar45/well-dash"
+Repository = "https://github.com/quasiStellar45/well-dash"
+
+[tool.setuptools]
+packages = ["wellapp"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
