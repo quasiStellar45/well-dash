@@ -7,6 +7,7 @@ from kagglehub import KaggleDatasetAdapter
 import plotly.express as px
 import pandas as pd
 import rasterio
+import py3dep
 
 def load_kaggle_data(file_name, data_handle):
     """
@@ -105,11 +106,11 @@ def plot_station_data(df: pd.DataFrame, station_id: str):
     fig.update_traces(mode="lines+markers")
     return fig
 
-def determine_elevation_from_raster(raster_path: str, long: float, lat: float):
-    """Determines the elevation from a raster at a lat and long provided."""
-    with rasterio.open(raster_path) as src:
-        # Convert lat/lon to row/col
-        for val in src.sample([(long, lat)]):
-            surface_elevation = val[0]
+def determine_elevation_from_raster(long: float, lat: float):
+    """Determines the elevation from 3DEP data at a lat and long provided."""
+    surface_elevation = py3dep.elevation_bycoords(
+        [(long, lat)],
+        crs=4326
+    )
 
     return surface_elevation
