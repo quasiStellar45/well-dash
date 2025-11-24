@@ -6,7 +6,7 @@ import kagglehub
 from kagglehub import KaggleDatasetAdapter
 import plotly.express as px
 import pandas as pd
-import os
+import rasterio
 
 def load_kaggle_data(file_name, data_handle):
     """
@@ -30,6 +30,7 @@ def load_kaggle_data(file_name, data_handle):
 
 def load_data():
     """Loads the data from Kaggle."""
+    # Load all csvs from the data handle
     data_handle = "alifarahmandfar/continuous-groundwater-level-measurements-2023"
     df_daily = load_kaggle_data('gwl-daily.csv',data_handle)
     df_monthly = load_kaggle_data('gwl-monthly.csv',data_handle)
@@ -103,3 +104,12 @@ def plot_station_data(df: pd.DataFrame, station_id: str):
     
     fig.update_traces(mode="lines+markers")
     return fig
+
+def determine_elevation_from_raster(raster_path: str, long: float, lat: float):
+    """Determines the elevation from a raster at a lat and long provided."""
+    with rasterio.open(raster_path) as src:
+        # Convert lat/lon to row/col
+        for val in src.sample([(long, lat)]):
+            surface_elevation = val[0]
+
+    return surface_elevation
