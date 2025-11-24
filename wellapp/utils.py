@@ -36,15 +36,27 @@ def load_data():
     quality_codes = load_kaggle_data('gwl-quality_codes.csv',data_handle)
     stations_df = load_kaggle_data('gwl-stations.csv',data_handle)
 
+    # Change the date column to datetime
+    df_daily['MSMT_DATE'] = pd.to_datetime(df_daily['MSMT_DATE'])
+    df_monthly['MSMT_DATE'] = pd.to_datetime(df_monthly['MSMT_DATE'])
+
     return df_daily, df_monthly, quality_codes, stations_df
 
-def get_columns():
-    df = load_data()
-    return df.columns
+def get_columns(df):
+    cols = df.columns
+    return cols
 
 
 def create_map(df: pd.DataFrame):
     """Function to create the map plot."""
+
+    # color map for plotting
+    color_map = {
+            "selected": "red",
+            "included": "blue",
+            "excluded": "lightgray",
+        }
+    # figure for map plot
     fig = px.scatter_mapbox(
         df,
         lat="LATITUDE",
@@ -57,8 +69,37 @@ def create_map(df: pd.DataFrame):
             "LONGITUDE": False,
         },
         mapbox_style="carto-positron",
-        zoom=1,
-        height=600
+        zoom=5,
+        height=600,
+        custom_data=["STATION"],
+        color="highlight",
+        color_discrete_map=color_map,
     )
     fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+    return fig
+
+def plot_station_data(df: pd.DataFrame, station_id: str):
+    """Plots the data for the selected station."""
+    # Locate the data for the station
+    df = df.copy().loc[df.STATION == station_id]
+    fig = px.scatter(
+        df,
+        x='MSMT_DATE',
+        y='WSE',
+        hover_data={
+            'WSE_QC':True
+        }
+        )
+    
+    # Update figure options
+    fig.update_layout(
+        template="plotly_white",
+        title=f"Water Level for Station {station_id}",
+        xaxis=dict(showline=True, linewidth=1, linecolor='black'),
+        yaxis=dict(showline=True, linewidth=1, linecolor='black'),
+        xaxis_title="Date",
+        yaxis_title="Water Surface Elevation (ft asl)"
+    )
+    
+    fig.update_traces(mode="lines+markers")
     return fig

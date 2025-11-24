@@ -2,13 +2,80 @@
 from dash import Input, Output
 import plotly.graph_objects as go
 import wellapp.utils as utils
+import pandas as pd
 
 def register_callbacks(app):
+    # Load the data
     df_daily, df_monthly, quality_codes, stations_df = utils.load_data()
 
+    # Create the map
     @app.callback(
         Output("map-plot", "figure"),
-        Input("column-dropdown", "value")
+        Input("freq-dropdown", "value"),
+        Input("selected-station", "data"),
+        Input("map-plot", "relayoutData")   
     )
-    def update_map(selected_col):
-        return utils.create_map(stations_df)
+    def update_map(freq, selected_station, relayout):
+
+        # Determine which stations have daily/monthly data   
+        if freq == "daily":
+            allowed = set(df_daily.STATION.unique())
+        elif freq == "monthly":
+            allowed = set(df_monthly.STATION.unique())
+        else:
+            allowed = set(stations_df.STATION.unique())
+
+        stations_df["highlight"] = stations_df["STATION"].apply(
+            lambda s: "selected" if s == selected_station
+            else ("included" if s in allowed else "excluded")
+        )
+
+        fig = utils.create_map(stations_df)
+
+        # If relayoutData has zoom/center, preserve them
+        if relayout is not None:
+            if "mapbox.zoom" in relayout:
+                fig.update_layout(mapbox={"zoom": relayout["mapbox.zoom"]})
+            if "mapbox.center" in relayout:
+                fig.update_layout(mapbox={"center": relayout["mapbox.center"]})
+
+        return fig
+    
+    # Store click data from map
+    @app.callback(
+        Output("selected-station", "data"),
+        Input("map-plot", "clickData")
+    )
+    def store_selected_station(clickData):
+        if clickData is None:
+            return None
+
+        # If you used customdata=["STATION"] when creating map
+        station_id = clickData["points"][0]["customdata"][0]
+
+        return station_id
+    
+    # Update the waterlevel plot with selection
+    @app.callback(
+        Output("wl-plot", "figure"),
+        Input("selected-station", "data"),
+        Input("freq-dropdown", "value")
+    )
+    def update_wl_plot(station_id, freq):
+        if station_id is None:
+            return go.Figure()
+
+        if freq == "daily":
+            df = df_daily
+        elif freq == "monthly":
+            df = df_monthly
+        else:
+            df = pd.concat([df_daily, df_monthly], ignore_index=True)
+
+        station_df = df.loc[df.STATION == station_id]
+
+        if station_df.empty:
+            return go.Figure()
+        
+        return utils.plot_station_data(df, station_id)
+    
