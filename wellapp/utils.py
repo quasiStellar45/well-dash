@@ -6,7 +6,6 @@ import kagglehub
 from kagglehub import KaggleDatasetAdapter
 import plotly.express as px
 import pandas as pd
-import rasterio
 import py3dep
 
 def load_kaggle_data(file_name, data_handle):
