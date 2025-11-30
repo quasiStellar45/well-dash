@@ -121,8 +121,8 @@ def register_callbacks(app):
             lon = click_loc["lon"]
             elevation = utils.determine_elevation_from_raster(lon, lat)
             X = np.array()
-            pred = model.predict(...)
-            fig.add_trace(pred)
+            #pred = model.predict(...)
+            #fig.add_trace(pred)
         
         # If a real station was selected, add real data
         #if station_id:
