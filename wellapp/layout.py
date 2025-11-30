@@ -138,6 +138,7 @@ layout = html.Div(
                         # Water level plot card (right side)
                         html.Div(
                             [
+                                html.Div(id='click-coords'),
                                 html.Div(
                                     [
                                         html.H3(
@@ -219,7 +220,8 @@ layout = html.Div(
         ),
 
         # Store components
-        dcc.Store(id="selected-station")
+        dcc.Store(id="selected-station"),
+        dcc.Store(id="click-location")
     ],
     style={
         "backgroundColor": "#f3f4f6",

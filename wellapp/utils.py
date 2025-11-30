@@ -66,8 +66,8 @@ def create_map(df: pd.DataFrame):
         hover_data={
             "ELEV": True,
             "WELL_DEPTH": True,
-            "LATITUDE": False,  # Hide lat/lon if not useful
-            "LONGITUDE": False,
+            "LATITUDE": True,  # Hide lat/lon if not useful
+            "LONGITUDE": True,
         },
         mapbox_style="carto-positron",
         zoom=5,
@@ -76,6 +76,7 @@ def create_map(df: pd.DataFrame):
         color="highlight",
         color_discrete_map=color_map,
     )
+
     fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
     return fig
 

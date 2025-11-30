@@ -1,8 +1,9 @@
-# app/callbacks.py
+# wellapp/callbacks.py
 from dash import Input, Output
 import plotly.graph_objects as go
 import wellapp.utils as utils
 import pandas as pd
+import numpy as np
 
 def register_callbacks(app):
     # Load the data
@@ -47,13 +48,40 @@ def register_callbacks(app):
         Input("map-plot", "clickData")
     )
     def store_selected_station(clickData):
-        if clickData is None:
+        if not clickData:
             return None
 
-        # If you used customdata=["STATION"] when creating map
+        # Check for customdata in the click
+        point = clickData["points"][0]
+        if "customdata" not in point or point["customdata"] is None:
+            return None
+        # Retrieve station id from click data
         station_id = clickData["points"][0]["customdata"][0]
 
         return station_id
+    
+    # Determine click coordinates
+    @app.callback(
+        Output("click-coords", "children"),
+        Input("map-plot", "clickData")
+    )
+    def display_click_coords(clickData):
+        if clickData:
+            lat = clickData["points"][0]["lat"]
+            lon = clickData["points"][0]["lon"]
+            return f"Clicked at LAT: {lat:.5f}, LON: {lon:.5f}"
+        return "Click the map to get coordinates."
+    
+    # Store click coords in a store component
+    @app.callback(
+        Output("click-location", "data"),
+        Input("map-plot", "clickData")
+    )
+    def store_click_coords(clickData):
+        if not clickData:
+            return None
+        point = clickData["points"][0]
+        return {"lat": point["lat"], "lon": point["lon"]}
     
     # Update the waterlevel plot with selection
     @app.callback(
@@ -79,3 +107,25 @@ def register_callbacks(app):
         
         return utils.plot_station_data(df, station_id)
     
+    @app.callback(
+        Output("wl-plot", "figure"),
+        Input("selected-station", "data"),    # Select station mode
+        Input("click-location", "data")       # Model prediction mode
+    )
+    def add_ml_plot(station_id, click_loc):
+        fig = go.Figure()
+
+        # If clicked location provided, call ML
+        if click_loc:
+            lat = click_loc["lat"]
+            lon = click_loc["lon"]
+            elevation = utils.determine_elevation_from_raster(lon, lat)
+            X = np.array()
+            pred = model.predict(...)
+            fig.add_trace(pred)
+        
+        # If a real station was selected, add real data
+        #if station_id:
+            # fig.add_trace(real_station_timeseries)
+
+        return fig
