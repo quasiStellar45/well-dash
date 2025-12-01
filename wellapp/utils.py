@@ -7,6 +7,8 @@ from kagglehub import KaggleDatasetAdapter
 import plotly.express as px
 import pandas as pd
 import py3dep
+import xgboost as xgb
+import joblib
 
 def load_kaggle_data(file_name, data_handle):
     """
@@ -114,3 +116,25 @@ def determine_elevation_from_raster(long: float, lat: float):
     )
 
     return surface_elevation
+
+def load_ml_model(model_name = "wl_xgb_model.json"):
+    """Load a XGBoost ml model."""
+    loaded_model = xgb.XGBRegressor()
+    loaded_model.load_model(model_name)
+    return loaded_model
+
+def load_encoder(encoder_path = "encoder.joblib"):
+    """Loads the encoder for station labels."""
+    le = joblib.load(encoder_path)
+    return le
+
+def encode_station(station_id, encoder):
+    """
+    Encode a station ID using the fitted LabelEncoder.
+    Returns 0 if station is not in the encoder's classes.
+    """
+    try:
+        return encoder.transform([station_id])[0]
+    except ValueError:
+        # Station not seen during training
+        return encoder.transform([encoder.classes_[0]])[0] 

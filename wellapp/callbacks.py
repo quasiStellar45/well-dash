@@ -9,6 +9,9 @@ def register_callbacks(app):
     # Load the data
     df_daily, df_monthly, quality_codes, stations_df = utils.load_data()
 
+    # Load the ml model
+    model = utils.load_ml_model()
+
     # Create the map
     @app.callback(
         Output("map-plot", "figure"),
@@ -87,45 +90,107 @@ def register_callbacks(app):
     @app.callback(
         Output("wl-plot", "figure"),
         Input("selected-station", "data"),
+        Input("click-location", "data"),
         Input("freq-dropdown", "value")
     )
-    def update_wl_plot(station_id, freq):
-        if station_id is None:
-            return go.Figure()
-
+    def update_wl_plot_with_ml(station_id, click_loc, freq):
+        if not station_id and not click_loc:
+            fig = go.Figure()
+        
+        # Determine which dataframe to use
         if freq == "daily":
             df = df_daily
         elif freq == "monthly":
             df = df_monthly
         else:
             df = pd.concat([df_daily, df_monthly], ignore_index=True)
-
-        station_df = df.loc[df.STATION == station_id]
-
-        if station_df.empty:
-            return go.Figure()
         
-        return utils.plot_station_data(df, station_id)
-    
-    @app.callback(
-        Output("wl-plot", "figure"),
-        Input("selected-station", "data"),    # Select station mode
-        Input("click-location", "data")       # Model prediction mode
-    )
-    def add_ml_plot(station_id, click_loc):
-        fig = go.Figure()
-
-        # If clicked location provided, call ML
-        if click_loc:
+        # Variables to store location info for ML prediction
+        lat, lon, elevation, well_depth = None, None, None, None
+        
+        # If a real station was selected, add real data AND get its info for ML
+        if station_id:
+            station_df = df.loc[df.STATION == station_id]
+            
+            if not station_df.empty:
+                # Plot real station data
+                fig = utils.plot_station_data(df, station_id)
+                
+                # Get station info for ML prediction
+                station_info = stations_df.loc[stations_df.STATION == station_id].iloc[0]
+                lat = station_info['LATITUDE']
+                lon = station_info['LONGITUDE']
+                elevation = station_info['ELEV']
+                well_depth = station_info['WELL_DEPTH']
+                le = utils.load_encoder()
+                station_encoded = utils.encode_station(station_id, le)
+                start_date = station_df['MSMT_DATE'].min()
+        
+        # If clicked location provided (but no station), use click coordinates
+        elif click_loc:
             lat = click_loc["lat"]
             lon = click_loc["lon"]
             elevation = utils.determine_elevation_from_raster(lon, lat)
-            X = np.array()
-            #pred = model.predict(...)
-            #fig.add_trace(pred)
+            well_depth = 0  # Unknown for arbitrary location
         
-        # If a real station was selected, add real data
-        #if station_id:
-            # fig.add_trace(real_station_timeseries)
-
+        # Generate ML prediction if we have a location (either from station or click)
+        if lat is not None and lon is not None:
+            # Create time range for prediction
+            end_date = pd.Timestamp.now()
+            if not start_date:
+                start_date = pd.Timestamp('2000-01-01')
+            date_range = pd.date_range(start=start_date, end=end_date, freq='ME')
+            
+            predictions = []
+            dates = []
+            
+            ref_date = pd.Timestamp('1800-01-01')  # Adjust to match your training
+            
+            for date in date_range:
+                days_since_ref = (date - ref_date).days
+                day_of_year = date.dayofyear
+                
+                # Create feature vector matching your training columns
+                X = np.array([[
+                    station_encoded,  # STATION_encoded (use 0 or mean for unknown location)
+                    date.day,
+                    date.month,
+                    date.year,
+                    days_since_ref,
+                    np.sin(2 * np.pi * day_of_year / 365.25),  # day_sin
+                    np.cos(2 * np.pi * day_of_year / 365.25),  # day_cos
+                    np.sin(2 * np.pi * date.month / 12),        # month_sin
+                    np.cos(2 * np.pi * date.month / 12),        # month_cos
+                    elevation,
+                    lat,
+                    lon,
+                    well_depth
+                ]])
+                
+                pred = model.predict(X)[0]
+                predictions.append(pred)
+                dates.append(date)
+            
+            # Add prediction trace to figure
+            fig.add_trace(go.Scatter(
+                x=dates,
+                y=predictions,
+                mode='lines',
+                name='ML Prediction',
+                line=dict(color='red', dash='dash', width=2)
+            ))
+            
+            # Update title to show it includes predictions
+            if station_id:
+                current_title = fig.layout.title.text if fig.layout.title else ""
+                fig.update_layout(
+                    title=f'{current_title} (with ML Prediction)'
+                )
+            else:
+                fig.update_layout(
+                    title=f'ML Prediction for LAT: {lat:.4f}, LON: {lon:.4f}',
+                    xaxis_title='Date',
+                    yaxis_title='Water Level'
+                )
+        
         return fig
