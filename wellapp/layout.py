@@ -62,11 +62,11 @@ layout = html.Div(
                                 dcc.Dropdown(
                                     id="freq-dropdown",
                                     options=[
-                                        {"label": "Daily Only", "value": "daily"},
-                                        {"label": "Monthly Only", "value": "monthly"},
                                         {"label": "All Data", "value": "all"},
+                                        {"label": "Monthly Data", "value": "monthly"},
+                                        {"label": "Daily Data", "value": "daily"},
                                     ],
-                                    value="daily",
+                                    value="all",
                                     clearable=False,
                                     style={
                                         "width": "100%",
@@ -197,6 +197,51 @@ layout = html.Div(
                 "margin": "0 auto",
                 "padding": "0 20px"
             }
+        ),
+
+        # Plot of seasonal variation
+        html.Div(
+            [
+                dcc.Graph(
+                    id='stl-trend',
+                    style={
+                        "height": "600px",
+                        "borderRadius": "8px",
+                        "overflow": "hidden"
+                    },
+                    config={
+                        "scrollZoom": True,
+                        "modeBarButtonsToRemove": ["select2d", "lasso2d"],
+                        "displaylogo": False
+                    }
+                ),
+                dcc.Graph(
+                    id='stl-seasonal',
+                    style={
+                        "height": "600px",
+                        "borderRadius": "8px",
+                        "overflow": "hidden"
+                    },
+                    config={
+                        "scrollZoom": True,
+                        "modeBarButtonsToRemove": ["select2d", "lasso2d"],
+                        "displaylogo": False
+                    }
+                ),
+                dcc.Graph(
+                    id='stl-resid',
+                    style={
+                        "height": "600px",
+                        "borderRadius": "8px",
+                        "overflow": "hidden"
+                    },
+                    config={
+                        "scrollZoom": True,
+                        "modeBarButtonsToRemove": ["select2d", "lasso2d"],
+                        "displaylogo": False
+                    } 
+                )
+            ]
         ),
         
         # Footer

@@ -9,6 +9,11 @@ import pandas as pd
 import py3dep
 import xgboost as xgb
 import joblib
+import numpy as np
+import plotly.graph_objects as go
+from statsmodels.tsa.statespace.structural import UnobservedComponents
+from statsmodels.tsa.seasonal import STL
+import matplotlib
 
 def load_kaggle_data(file_name, data_handle):
     """
@@ -79,6 +84,35 @@ def create_map(df: pd.DataFrame):
         color_discrete_map=color_map,
     )
 
+    # # Create an invisible grid that covers the dataframe bounding box
+    # lat_min, lat_max = df["LATITUDE"].min(), df["LATITUDE"].max()
+    # lon_min, lon_max = df["LONGITUDE"].min(), df["LONGITUDE"].max()
+
+    # # Small padding so the grid is definitely inside the viewport
+    # pad_lat = max(0.5, (lat_max - lat_min) * 0.1)
+    # pad_lon = max(0.5, (lon_max - lon_min) * 0.1)
+
+    # lats = np.linspace(lat_min - pad_lat, lat_max + pad_lat, 200)
+    # lons = np.linspace(lon_min - pad_lon, lon_max + pad_lon, 100)
+    # lat_grid, lon_grid = np.meshgrid(lats, lons)
+
+    # fig.add_densitymapbox(
+    #     lat=lat_grid.flatten(),
+    #     lon=lon_grid.flatten(),
+    #     z=np.zeros_like(lat_grid).flatten(),
+    #     radius=50,  # large so it fills the map
+    #     opacity=0,  # invisible
+    #     showscale=False,
+    #     hoverinfo="none",
+    # )
+
+    # Add the invisible trace (this appends it), then move it to the front safely
+    # fig.add_trace(invisible_layer)
+    # data_list = list(fig.data)
+    # move the last added trace to the front so it has click priority
+    # data_list.insert(0, data_list.pop(-1))
+    # fig.data = tuple(data_list)
+
     fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
     return fig
 
@@ -92,9 +126,14 @@ def plot_station_data(df: pd.DataFrame, station_id: str):
         y='WSE',
         hover_data={
             'WSE_QC':True
-        }
+        },
         )
     
+    # Change trace type and name for legend
+    fig.update_traces(mode="lines+markers", 
+                      name="Water Level Data",
+                      showlegend=True)
+
     # Update figure options
     fig.update_layout(
         template="plotly_white",
@@ -102,10 +141,9 @@ def plot_station_data(df: pd.DataFrame, station_id: str):
         xaxis=dict(showline=True, linewidth=1, linecolor='black'),
         yaxis=dict(showline=True, linewidth=1, linecolor='black'),
         xaxis_title="Date",
-        yaxis_title="Water Surface Elevation (ft asl)"
+        yaxis_title="Water Surface Elevation (ft asl)",
+        showlegend=True
     )
-    
-    fig.update_traces(mode="lines+markers")
     return fig
 
 def determine_elevation_from_raster(long: float, lat: float):
@@ -138,3 +176,102 @@ def encode_station(station_id, encoder):
     except ValueError:
         # Station not seen during training
         return encoder.transform([encoder.classes_[0]])[0] 
+    
+def create_stl_plot(station_df):
+    """
+    Creates a plot of seasonal variation for the data and ml model
+    
+    :param station_df: df for the station
+    """
+    # Ensure station_df has a DatetimeIndex
+    df_test = station_df.copy().sort_values('MSMT_DATE')
+    df_test['MSMT_DATE'] = pd.to_datetime(df_test['MSMT_DATE'])
+    df_test = df_test.set_index('MSMT_DATE')
+    y = df_test['WSE']
+
+    # Fit UnobservedComponents model
+    mod = UnobservedComponents(y, level='local level', seasonal=13)
+    res_ucm = mod.fit()
+
+    # Get smoothed level as a Series with correct index
+    filled = pd.Series(res_ucm.smoothed_state[0], index=y.index)
+
+    # STL decomposition — monthly example: period=13
+    stl = STL(filled, period=13)
+    res_stl = stl.fit()
+
+    # Observed + trend
+    fig_trend = go.Figure()
+    fig_trend.add_trace(go.Scatter(
+        x=filled.index,
+        y=y,
+        mode='lines+markers',
+        name='Observed',
+        line=dict(color='blue')
+    ))
+    fig_trend.add_trace(go.Scatter(
+        x=filled.index,
+        y=filled,
+        mode='lines',
+        name='Unobserved Estimation',
+        line=dict(color='green', dash='dash')
+    ))
+    fig_trend.add_trace(go.Scatter(
+        x=filled.index,
+        y=res_stl.trend,
+        mode='lines',
+        name='Trend',
+        line=dict(color='orange', dash='dash')
+    ))
+    fig_trend.update_layout(
+        title='Trend Component',
+        xaxis_title='Date',
+        yaxis_title='Water Level',
+        template='plotly_white'
+    )
+
+    # Seasonal component
+    fig_seasonal = go.Figure()
+    fig_seasonal.add_trace(go.Scatter(
+        x=filled.index,
+        y=res_stl.seasonal,
+        mode='lines',
+        name='Seasonal',
+        line=dict(color='magenta')
+    ))
+    fig_seasonal.update_layout(
+        title='Seasonal Component',
+        xaxis_title='Date',
+        yaxis_title='Water Level',
+        template='plotly_white'
+    )
+
+    # Residual component
+    fig_resid = go.Figure()
+    fig_resid.add_trace(go.Scatter(
+        x=filled.index,
+        y=res_stl.resid,
+        mode='lines',
+        name='Residual',
+        line=dict(color='brown')
+    ))
+    fig_resid.update_layout(
+        title='Residual Component',
+        xaxis_title='Date',
+        yaxis_title='Water Level',
+        template='plotly_white'
+    )
+
+    return fig_trend, fig_seasonal, fig_resid
+
+def create_empty_fig(title, yaxis_title, xaxis_title="Date"):
+    fig = go.Figure()
+    fig.update_layout(
+        template="plotly_white",
+        title=title,
+        xaxis=dict(showline=True, linewidth=1, linecolor='black'),
+        yaxis=dict(showline=True, linewidth=1, linecolor='black'),
+        xaxis_title=xaxis_title,
+        yaxis_title=yaxis_title,
+    )
+    return fig

@@ -56,12 +56,11 @@ def register_callbacks(app):
 
         # Check for customdata in the click
         point = clickData["points"][0]
-        if "customdata" not in point or point["customdata"] is None:
-            return None
-        # Retrieve station id from click data
-        station_id = clickData["points"][0]["customdata"][0]
+        if "customdata" in point and point["customdata"]:
+            return point["customdata"][0]
 
-        return station_id
+        # Otherwise, user clicked on empty map, do not change station selection
+        return None
     
     # Determine click coordinates
     @app.callback(
@@ -91,12 +90,13 @@ def register_callbacks(app):
         Output("wl-plot", "figure"),
         Input("selected-station", "data"),
         Input("click-location", "data"),
-        Input("freq-dropdown", "value")
+        Input("freq-dropdown", "value"),
+        prevent_initial_call=False
     )
     def update_wl_plot_with_ml(station_id, click_loc, freq):
         if not station_id and not click_loc:
-            fig = go.Figure()
-        
+            fig = utils.create_empty_fig("Select a station to plot waterlevel...", "Water Surface Elevation (ft asl)")
+                
         # Determine which dataframe to use
         if freq == "daily":
             df = df_daily
@@ -107,7 +107,7 @@ def register_callbacks(app):
         
         # Variables to store location info for ML prediction
         lat, lon, elevation, well_depth = None, None, None, None
-        
+        le = utils.load_encoder()
         # If a real station was selected, add real data AND get its info for ML
         if station_id:
             station_df = df.loc[df.STATION == station_id]
@@ -122,7 +122,6 @@ def register_callbacks(app):
                 lon = station_info['LONGITUDE']
                 elevation = station_info['ELEV']
                 well_depth = station_info['WELL_DEPTH']
-                le = utils.load_encoder()
                 station_encoded = utils.encode_station(station_id, le)
                 start_date = station_df['MSMT_DATE'].min()
         
@@ -131,7 +130,13 @@ def register_callbacks(app):
             lat = click_loc["lat"]
             lon = click_loc["lon"]
             elevation = utils.determine_elevation_from_raster(lon, lat)
-            well_depth = 0  # Unknown for arbitrary location
+            well_depth = 100  # Unknown for arbitrary location
+            start_date = None
+            station_id = 'test'
+            station_encoded = utils.encode_station(station_id, le)
+
+            # Create empty figure
+            fig = utils.create_empty_fig(f"Water Level for Station {station_id}", "Water Surface Elevation (ft asl)")
         
         # Generate ML prediction if we have a location (either from station or click)
         if lat is not None and lon is not None:
@@ -144,7 +149,7 @@ def register_callbacks(app):
             predictions = []
             dates = []
             
-            ref_date = pd.Timestamp('1800-01-01')  # Adjust to match your training
+            ref_date = pd.Timestamp('1800-01-01')  # Adjust to model
             
             for date in date_range:
                 days_since_ref = (date - ref_date).days
@@ -157,8 +162,8 @@ def register_callbacks(app):
                     date.month,
                     date.year,
                     days_since_ref,
-                    np.sin(2 * np.pi * day_of_year / 365.25),  # day_sin
-                    np.cos(2 * np.pi * day_of_year / 365.25),  # day_cos
+                    np.sin(2 * np.pi * day_of_year / 365),  # day_sin
+                    np.cos(2 * np.pi * day_of_year / 365),  # day_cos
                     np.sin(2 * np.pi * date.month / 12),        # month_sin
                     np.cos(2 * np.pi * date.month / 12),        # month_cos
                     elevation,
@@ -181,7 +186,7 @@ def register_callbacks(app):
             ))
             
             # Update title to show it includes predictions
-            if station_id:
+            if station_id != 'test':
                 current_title = fig.layout.title.text if fig.layout.title else ""
                 fig.update_layout(
                     title=f'{current_title} (with ML Prediction)'
@@ -190,7 +195,28 @@ def register_callbacks(app):
                 fig.update_layout(
                     title=f'ML Prediction for LAT: {lat:.4f}, LON: {lon:.4f}',
                     xaxis_title='Date',
-                    yaxis_title='Water Level'
+                    yaxis_title='Water Level',
+                    showlegend=True
                 )
+
+            fig.update_layout(showlegend=True)
         
         return fig
+
+    @app.callback(
+        Output("stl-trend", "figure"),
+        Output("stl-seasonal", "figure"),
+        Output("stl-resid", "figure"),
+        Input("selected-station", "data"),
+        prevent_initial_call=False
+    )
+    def plot_seasonal_variation(station_id):
+        if not station_id:
+            fig_trend = utils.create_empty_fig("Trend Component", "Water Surface Elevation (ft asl)")
+            fig_seasonal = utils.create_empty_fig("Seasonal Component", "Seasonal Variation (ft)")
+            fig_resid = utils.create_empty_fig("Residual Component", "Residual (ft)")
+        else:
+            station_df = df_monthly.loc[df_monthly.STATION == station_id, ['MSMT_DATE','WSE']]
+            fig_trend, fig_seasonal, fig_resid = utils.create_stl_plot(station_df)
+
+        return fig_trend, fig_seasonal, fig_resid
