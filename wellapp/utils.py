@@ -13,7 +13,6 @@ import numpy as np
 import plotly.graph_objects as go
 from statsmodels.tsa.statespace.structural import UnobservedComponents
 from statsmodels.tsa.seasonal import STL
-import matplotlib
 
 def load_kaggle_data(file_name, data_handle):
     """
@@ -226,7 +225,7 @@ def create_stl_plot(station_df):
     fig_trend.update_layout(
         title='Trend Component',
         xaxis_title='Date',
-        yaxis_title='Water Level',
+        yaxis_title="Water Surface Elevation (ft asl)",
         template='plotly_white'
     )
 
@@ -242,7 +241,7 @@ def create_stl_plot(station_df):
     fig_seasonal.update_layout(
         title='Seasonal Component',
         xaxis_title='Date',
-        yaxis_title='Water Level',
+        yaxis_title="Seasonal Variation (ft)",
         template='plotly_white'
     )
 
@@ -258,7 +257,7 @@ def create_stl_plot(station_df):
     fig_resid.update_layout(
         title='Residual Component',
         xaxis_title='Date',
-        yaxis_title='Water Level',
+        yaxis_title="Residual (ft)",
         template='plotly_white'
     )
 
@@ -275,3 +274,50 @@ def create_empty_fig(title, yaxis_title, xaxis_title="Date"):
         yaxis_title=yaxis_title,
     )
     return fig
+
+def generate_ml_predictions(station_id, station_df, stations_df, model):
+    """Generate ML predictions for a station."""
+    le = load_encoder()
+    
+    # Get station info
+    station_info = stations_df.loc[stations_df.STATION == station_id].iloc[0]
+    lat = station_info['LATITUDE']
+    lon = station_info['LONGITUDE']
+    elevation = station_info['ELEV']
+    well_depth = station_info['WELL_DEPTH']
+    station_encoded = encode_station(station_id, le)
+    
+    # Create date range
+    start_date = station_df['MSMT_DATE'].min()
+    end_date = pd.Timestamp.now()
+    date_range = pd.date_range(start=start_date, end=end_date, freq='ME')
+    
+    predictions = []
+    dates = []
+    ref_date = pd.Timestamp('1800-01-01')
+    
+    for date in date_range:
+        days_since_ref = (date - ref_date).days
+        day_of_year = date.dayofyear
+        
+        X = np.array([[
+            station_encoded,
+            date.day,
+            date.month,
+            date.year,
+            days_since_ref,
+            np.sin(2 * np.pi * day_of_year / 365),
+            np.cos(2 * np.pi * day_of_year / 365),
+            np.sin(2 * np.pi * date.month / 12),
+            np.cos(2 * np.pi * date.month / 12),
+            elevation,
+            lat,
+            lon,
+            well_depth
+        ]])
+        
+        pred = model.predict(X)[0]
+        predictions.append(pred)
+        dates.append(date)
+    
+    return predictions, dates

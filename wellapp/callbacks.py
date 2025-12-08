@@ -4,6 +4,8 @@ import plotly.graph_objects as go
 import wellapp.utils as utils
 import pandas as pd
 import numpy as np
+from dash import dcc, html
+import plotly.express as px
 
 def register_callbacks(app):
     # Load the data
@@ -26,8 +28,6 @@ def register_callbacks(app):
             allowed = set(df_daily.STATION.unique())
         elif freq == "monthly":
             allowed = set(df_monthly.STATION.unique())
-        else:
-            allowed = set(stations_df.STATION.unique())
 
         stations_df["highlight"] = stations_df["STATION"].apply(
             lambda s: "selected" if s == selected_station
@@ -62,102 +62,65 @@ def register_callbacks(app):
         # Otherwise, user clicked on empty map, do not change station selection
         return None
     
-    # Determine click coordinates
-    @app.callback(
-        Output("click-coords", "children"),
-        Input("map-plot", "clickData")
-    )
-    def display_click_coords(clickData):
-        if clickData:
-            lat = clickData["points"][0]["lat"]
-            lon = clickData["points"][0]["lon"]
-            return f"Clicked at LAT: {lat:.5f}, LON: {lon:.5f}"
-        return "Click the map to get coordinates."
-    
-    # Store click coords in a store component
-    @app.callback(
-        Output("click-location", "data"),
-        Input("map-plot", "clickData")
-    )
-    def store_click_coords(clickData):
-        if not clickData:
-            return None
-        point = clickData["points"][0]
-        return {"lat": point["lat"], "lon": point["lon"]}
-    
     # Update the waterlevel plot with selection
     @app.callback(
         Output("wl-plot", "figure"),
+        Output("stl-trend", "figure"),
+        Output("stl-seasonal", "figure"),
+        Output("stl-resid", "figure"),
         Input("selected-station", "data"),
-        Input("click-location", "data"),
         Input("freq-dropdown", "value"),
         prevent_initial_call=False
     )
-    def update_wl_plot_with_ml(station_id, click_loc, freq):
-        if not station_id and not click_loc:
+    def update_wl_plot_with_ml(station_id, freq):
+        if not station_id:
             fig = utils.create_empty_fig("Select a station to plot waterlevel...", "Water Surface Elevation (ft asl)")
+            fig_trend = utils.create_empty_fig("Trend Component", "Water Surface Elevation (ft asl)")
+            fig_seasonal = utils.create_empty_fig("Seasonal Component", "Seasonal Variation (ft)")
+            fig_resid = utils.create_empty_fig("Residual Component", "Residual (ft)")
+            return fig, fig_trend, fig_seasonal, fig_resid
                 
         # Determine which dataframe to use
         if freq == "daily":
             df = df_daily
         elif freq == "monthly":
             df = df_monthly
-        else:
-            df = pd.concat([df_daily, df_monthly], ignore_index=True)
         
         # Variables to store location info for ML prediction
         lat, lon, elevation, well_depth = None, None, None, None
         le = utils.load_encoder()
+        
         # If a real station was selected, add real data AND get its info for ML
-        if station_id:
-            station_df = df.loc[df.STATION == station_id]
+        station_df = df.loc[df.STATION == station_id]
+        if not station_df.empty:
+            # Plot real station data
+            fig = utils.plot_station_data(df, station_id)
             
-            if not station_df.empty:
-                # Plot real station data
-                fig = utils.plot_station_data(df, station_id)
-                
-                # Get station info for ML prediction
-                station_info = stations_df.loc[stations_df.STATION == station_id].iloc[0]
-                lat = station_info['LATITUDE']
-                lon = station_info['LONGITUDE']
-                elevation = station_info['ELEV']
-                well_depth = station_info['WELL_DEPTH']
-                station_encoded = utils.encode_station(station_id, le)
-                start_date = station_df['MSMT_DATE'].min()
-        
-        # If clicked location provided (but no station), use click coordinates
-        elif click_loc:
-            lat = click_loc["lat"]
-            lon = click_loc["lon"]
-            elevation = utils.determine_elevation_from_raster(lon, lat)
-            well_depth = 100  # Unknown for arbitrary location
-            start_date = None
-            station_id = 'test'
+            # Get station info for ML prediction
+            station_info = stations_df.loc[stations_df.STATION == station_id].iloc[0]
+            lat = station_info['LATITUDE']
+            lon = station_info['LONGITUDE']
+            elevation = station_info['ELEV']
+            well_depth = station_info['WELL_DEPTH']
             station_encoded = utils.encode_station(station_id, le)
-
-            # Create empty figure
-            fig = utils.create_empty_fig(f"Water Level for Station {station_id}", "Water Surface Elevation (ft asl)")
+            start_date = station_df['MSMT_DATE'].min()
         
-        # Generate ML prediction if we have a location (either from station or click)
-        if lat is not None and lon is not None:
-            # Create time range for prediction
+            # Generate ML prediction for main plot (extends to now)
             end_date = pd.Timestamp.now()
-            if not start_date:
-                start_date = pd.Timestamp('2000-01-01')
-            date_range = pd.date_range(start=start_date, end=end_date, freq='ME')
+            date_range_full = pd.date_range(start=start_date, end=end_date, freq='ME')
             
-            predictions = []
-            dates = []
+            predictions_full = []
+            dates_full = []
             
             ref_date = pd.Timestamp('1800-01-01')  # Adjust to model
             
-            for date in date_range:
+            for date in date_range_full:
                 days_since_ref = (date - ref_date).days
                 day_of_year = date.dayofyear
                 
                 # Create feature vector matching your training columns
                 X = np.array([[
-                    station_encoded,  # STATION_encoded (use 0 or mean for unknown location)
+                    station_encoded,
                     date.day,
                     date.month,
                     date.year,
@@ -173,50 +136,310 @@ def register_callbacks(app):
                 ]])
                 
                 pred = model.predict(X)[0]
-                predictions.append(pred)
-                dates.append(date)
+                predictions_full.append(pred)
+                dates_full.append(date)
             
-            # Add prediction trace to figure
+            # Generate ML prediction for trend plot (only up to last data point)
+            station_df_monthly = df_monthly.loc[df_monthly.STATION == station_id, ['MSMT_DATE','WSE']]
+            last_data_date = station_df_monthly['MSMT_DATE'].max()
+            date_range_trend = pd.date_range(start=start_date, end=last_data_date, freq='ME')
+            
+            predictions_trend = []
+            dates_trend = []
+            
+            for date in date_range_trend:
+                days_since_ref = (date - ref_date).days
+                day_of_year = date.dayofyear
+                
+                X = np.array([[
+                    station_encoded,
+                    date.day,
+                    date.month,
+                    date.year,
+                    days_since_ref,
+                    np.sin(2 * np.pi * day_of_year / 365),
+                    np.cos(2 * np.pi * day_of_year / 365),
+                    np.sin(2 * np.pi * date.month / 12),
+                    np.cos(2 * np.pi * date.month / 12),
+                    elevation,
+                    lat,
+                    lon,
+                    well_depth
+                ]])
+                
+                pred = model.predict(X)[0]
+                predictions_trend.append(pred)
+                dates_trend.append(date)
+            
+            # Add prediction trace to main figure (full range)
             fig.add_trace(go.Scatter(
-                x=dates,
-                y=predictions,
+                x=dates_full,
+                y=predictions_full,
                 mode='lines',
                 name='ML Prediction',
                 line=dict(color='red', dash='dash', width=2)
             ))
             
             # Update title to show it includes predictions
-            if station_id != 'test':
-                current_title = fig.layout.title.text if fig.layout.title else ""
-                fig.update_layout(
-                    title=f'{current_title} (with ML Prediction)'
-                )
-            else:
-                fig.update_layout(
-                    title=f'ML Prediction for LAT: {lat:.4f}, LON: {lon:.4f}',
-                    xaxis_title='Date',
-                    yaxis_title='Water Level',
-                    showlegend=True
-                )
+            current_title = fig.layout.title.text if fig.layout.title else ""
+            fig.update_layout(
+                title=f'{current_title} (with ML Prediction)',
+                showlegend=True
+            )
 
-            fig.update_layout(showlegend=True)
+            # Create STL plots
+            fig_trend, fig_seasonal, fig_resid = utils.create_stl_plot(station_df_monthly)
+            
+            # Add ML prediction to trend plot (only up to last data point)
+            fig_trend.add_trace(go.Scatter(
+                x=dates_trend,
+                y=predictions_trend,
+                mode='lines',
+                name='ML Prediction',
+                line=dict(color='red', dash='dash', width=2)
+            ))
+            
+            fig_trend.update_layout(showlegend=True)
         
-        return fig
-
+        return fig, fig_trend, fig_seasonal, fig_resid
+    
+    # Create spatial prediction map with station markers as reference
     @app.callback(
-        Output("stl-trend", "figure"),
-        Output("stl-seasonal", "figure"),
-        Output("stl-resid", "figure"),
-        Input("selected-station", "data"),
+        Output("spatial-map", "figure"),
+        Input("spatial-click-location", "data"),
         prevent_initial_call=False
     )
-    def plot_seasonal_variation(station_id):
-        if not station_id:
-            fig_trend = utils.create_empty_fig("Trend Component", "Water Surface Elevation (ft asl)")
-            fig_seasonal = utils.create_empty_fig("Seasonal Component", "Seasonal Variation (ft)")
-            fig_resid = utils.create_empty_fig("Residual Component", "Residual (ft)")
-        else:
-            station_df = df_monthly.loc[df_monthly.STATION == station_id, ['MSMT_DATE','WSE']]
-            fig_trend, fig_seasonal, fig_resid = utils.create_stl_plot(station_df)
-
-        return fig_trend, fig_seasonal, fig_resid
+    def update_spatial_map(click_data):
+        # Start with empty figure
+        fig = go.Figure()
+        
+        # Add station markers as reference (grey, small, behind everything)
+        fig.add_trace(go.Scattermapbox(
+            lat=stations_df["LATITUDE"],
+            lon=stations_df["LONGITUDE"],
+            mode='markers',
+            marker=dict(size=6, color='lightgray', opacity=0.4),
+            name='Reference Stations',
+            showlegend=True,
+            hovertemplate=(
+                "<b>%{hovertext}</b><br>"
+                "Lat: %{lat:.4f}<br>"
+                "Lon: %{lon:.4f}<br>"
+                "<extra></extra>"
+            ),
+            hovertext=stations_df["STATION"]
+        ))
+        
+        # Create invisible clickable grid covering the map
+        lat_min, lat_max = stations_df["LATITUDE"].min(), stations_df["LATITUDE"].max()
+        lon_min, lon_max = stations_df["LONGITUDE"].min(), stations_df["LONGITUDE"].max()
+        
+        pad_lat = max(0.5, (lat_max - lat_min) * 0.1)
+        pad_lon = max(0.5, (lon_max - lon_min) * 0.1)
+        
+        # Create a grid of invisible points
+        lats = np.linspace(lat_min - pad_lat, lat_max + pad_lat, 50)
+        lons = np.linspace(lon_min - pad_lon, lon_max + pad_lon, 50)
+        lat_grid, lon_grid = np.meshgrid(lats, lons)
+        
+        fig.add_trace(go.Scattermapbox(
+            lat=lat_grid.flatten(),
+            lon=lon_grid.flatten(),
+            mode='markers',
+            marker=dict(size=15, opacity=0),  # Invisible but clickable
+            showlegend=False,
+            hoverinfo='none',
+            name='clickable_background'
+        ))
+        
+        # If a location has been clicked, add a marker for it (on top)
+        if click_data:
+            fig.add_trace(go.Scattermapbox(
+                lat=[click_data["lat"]],
+                lon=[click_data["lon"]],
+                mode='markers',
+                marker=dict(size=15, color='red', symbol='circle'),
+                name='Selected Location',
+                showlegend=True,
+                hovertemplate=(
+                    f"<b>Selected Location</b><br>"
+                    f"Latitude: {click_data['lat']:.4f}<br>"
+                    f"Longitude: {click_data['lon']:.4f}<br>"
+                    f"Elevation: {click_data.get('elevation', 'N/A')} ft<br>"
+                    "<extra></extra>"
+                )
+            ))
+        
+        # Set map center and zoom
+        center_lat = (lat_min + lat_max) / 2
+        center_lon = (lon_min + lon_max) / 2
+        
+        fig.update_layout(
+            mapbox=dict(
+                style="carto-positron",
+                center=dict(lat=center_lat, lon=center_lon),
+                zoom=5
+            ),
+            margin={"r":0,"t":0,"l":0,"b":0},
+            showlegend=True,
+            height=600
+        )
+        
+        return fig
+    
+    # Handle clicks on spatial map
+    @app.callback(
+        Output("spatial-click-location", "data"),
+        Input("spatial-map", "clickData"),
+        prevent_initial_call=True
+    )
+    def capture_spatial_click(click_data):
+        if not click_data:
+            return None
+        
+        # Extract lat/lon from click
+        point = click_data["points"][0]
+        lat = point["lat"]
+        lon = point["lon"]
+        
+        # Get elevation from raster
+        elevation = utils.determine_elevation_from_raster(lon, lat)
+        
+        return {
+            "lat": lat,
+            "lon": lon,
+            "elevation": elevation
+        }
+    
+    # Display click information
+    @app.callback(
+        Output("click-info", "children"),
+        Input("spatial-click-location", "data"),
+        prevent_initial_call=False
+    )
+    def display_click_info(click_data):
+        if not click_data:
+            return html.Div(
+                "👆 Click on the map to select a location",
+                style={
+                    "padding": "12px 16px",
+                    "backgroundColor": "#f3f4f6",
+                    "borderRadius": "8px",
+                    "fontSize": "14px",
+                    "color": "#6b7280",
+                    "border": "1px dashed #d1d5db"
+                }
+            )
+        
+        return html.Div(
+            [
+                html.Div(
+                    [
+                        html.Span("✓ ", style={"color": "#10b981", "fontWeight": "700"}),
+                        html.Span("Location Selected", style={"fontWeight": "600", "color": "#111827"})
+                    ],
+                    style={"marginBottom": "8px"}
+                ),
+                html.Div(
+                    [
+                        html.Div(f"Latitude: {click_data['lat']:.4f}°", style={"fontSize": "13px", "color": "#4b5563"}),
+                        html.Div(f"Longitude: {click_data['lon']:.4f}°", style={"fontSize": "13px", "color": "#4b5563"}),
+                        html.Div(f"Elevation: {click_data.get('elevation', 'N/A')} ft", style={"fontSize": "13px", "color": "#4b5563"})
+                    ]
+                )
+            ],
+            style={
+                "padding": "12px 16px",
+                "backgroundColor": "#ecfdf5",
+                "borderRadius": "8px",
+                "border": "1px solid #10b981"
+            }
+        )
+    
+    # Generate spatial prediction
+    @app.callback(
+        Output("spatial-prediction-plot", "figure"),
+        Input("spatial-click-location", "data"),
+        Input("well-depth-input", "value"),
+        prevent_initial_call=False
+    )
+    def update_spatial_prediction(click_data, well_depth):
+        if not click_data:
+            return utils.create_empty_fig(
+                "Click on the map to generate predictions",
+                "Water Surface Elevation (ft asl)"
+            )
+        
+        lat = click_data["lat"]
+        lon = click_data["lon"]
+        elevation = click_data.get("elevation", 0)
+        
+        # Use a dummy station ID for encoding
+        le = utils.load_encoder()
+        station_encoded = 0  # or use mean encoding for unknown stations
+        
+        # Generate predictions from 2000 to now
+        start_date = pd.Timestamp('2000-01-01')
+        end_date = pd.Timestamp.now()
+        date_range = pd.date_range(start=start_date, end=end_date, freq='ME')
+        
+        predictions = []
+        dates = []
+        ref_date = pd.Timestamp('1800-01-01')
+        
+        for date in date_range:
+            days_since_ref = (date - ref_date).days
+            day_of_year = date.dayofyear
+            
+            # Create feature vector
+            X = np.array([[
+                station_encoded,
+                date.day,
+                date.month,
+                date.year,
+                days_since_ref,
+                np.sin(2 * np.pi * day_of_year / 365),
+                np.cos(2 * np.pi * day_of_year / 365),
+                np.sin(2 * np.pi * date.month / 12),
+                np.cos(2 * np.pi * date.month / 12),
+                elevation,
+                lat,
+                lon,
+                well_depth
+            ]])
+            
+            pred = model.predict(X)[0]
+            predictions.append(pred)
+            dates.append(date)
+        
+        # Create plot
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scatter(
+            x=dates,
+            y=predictions,
+            mode='lines',
+            name='ML Prediction',
+            line=dict(color='#dc2626', width=2)
+        ))
+        
+        fig.update_layout(
+            template="plotly_white",
+            title=f"Predicted Water Level at ({lat:.4f}°, {lon:.4f}°)",
+            xaxis=dict(
+                showline=True,
+                linewidth=1,
+                linecolor='black',
+                title="Date"
+            ),
+            yaxis=dict(
+                showline=True,
+                linewidth=1,
+                linecolor='black',
+                title="Water Surface Elevation (ft asl)"
+            ),
+            showlegend=True,
+            hovermode='x unified'
+        )
+        
+        return fig
