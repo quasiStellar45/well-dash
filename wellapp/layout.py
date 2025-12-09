@@ -582,7 +582,66 @@ layout = html.Div(
                                             style={
                                                 "display": "flex",
                                                 "justifyContent": "space-between",
-                                                "gap": "25px"
+                                                "gap": "25px",
+                                                "marginbottom": "25px"
+                                            }
+                                        ),
+                                        # Nearby stations plot
+                                        html.Div(
+                                            [
+                                                html.Div(
+                                                    [
+                                                        html.Div(
+                                                            [
+                                                                html.Span(
+                                                                    "📊",
+                                                                    style={"fontSize": "24px", "marginRight": "10px"}
+                                                                ),
+                                                                html.H3(
+                                                                    "Nearby Station Water Levels",
+                                                                    style={
+                                                                        "margin": "0",
+                                                                        "fontSize": "22px",
+                                                                        "fontWeight": "700",
+                                                                        "color": "#111827",
+                                                                        "display": "inline"
+                                                                    }
+                                                                )
+                                                            ],
+                                                            style={"display": "flex", "alignItems": "center", "marginBottom": "8px"}
+                                                        ),
+                                                        html.P(
+                                                            "Historical water levels from monitoring stations near the selected location",
+                                                            style={
+                                                                "margin": "0 0 20px 0",
+                                                                "fontSize": "14px",
+                                                                "color": "#6b7280",
+                                                                "lineHeight": "1.5"
+                                                            }
+                                                        )
+                                                    ]
+                                                ),
+                                                dcc.Graph(
+                                                    id="nearby-stations-plot",
+                                                    style={
+                                                        "height": "500px",
+                                                        "borderRadius": "12px",
+                                                        "overflow": "hidden",
+                                                        "border": "1px solid #e5e7eb"
+                                                    },
+                                                    config={
+                                                        "scrollZoom": True,
+                                                        "modeBarButtonsToRemove": ["select2d", "lasso2d"],
+                                                        "displaylogo": False
+                                                    }
+                                                )
+                                            ],
+                                            style={
+                                                "backgroundColor": "white",
+                                                "padding": "30px",
+                                                "borderRadius": "16px",
+                                                "boxShadow": "0 4px 12px rgba(0, 0, 0, 0.08)",
+                                                "border": "1px solid #e5e7eb"
                                             }
                                         )
                                     ],

@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import wellapp.utils as utils
 import pandas as pd
 import numpy as np
-from dash import dcc, html
+from dash import dcc, html, State
 import plotly.express as px
 
 def register_callbacks(app):
@@ -440,6 +440,145 @@ def register_callbacks(app):
             ),
             showlegend=True,
             hovermode='x unified'
+        )
+        
+        return fig
+    
+    @app.callback(
+        Output("nearby-stations-plot", "figure"),
+        Input("spatial-click-location", "data"),
+        State("freq-dropdown", "value")
+    )
+    def update_nearby_stations_plot(click_location, freq):
+        """
+        Plot water levels from stations within radius of clicked location.
+        """
+        # Default empty figure
+        if not click_location:
+            fig = go.Figure()
+            fig.update_layout(
+                title="Click on the map to see nearby station water levels",
+                template="plotly_white",
+                height=500,
+                xaxis_title="Date",
+                yaxis_title="Water Level (ft)",
+                font=dict(family="Arial, sans-serif", size=12),
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="white"
+            )
+            return fig
+        
+        # Get clicked coordinates
+        clicked_lat = click_location['lat']
+        clicked_lon = click_location['lon']
+        
+        # Select appropriate dataset
+        df = df_monthly if freq == 'monthly' else df_daily
+        
+        # Get unique stations with their coordinates
+        stations = stations_df[['STATION', 'LATITUDE', 'LONGITUDE']].drop_duplicates()
+        
+        # Calculate distance to each station
+        stations['distance_km'] = stations.apply(
+            lambda row: utils.calculate_distance(
+                clicked_lat, clicked_lon, 
+                row['LATITUDE'], row['LONGITUDE']
+            ),
+            axis=1
+        )
+        
+        # Filter stations within radius (e.g., 50 km)
+        RADIUS_KM = 50
+        nearby_stations = stations[stations['distance_km'] <= RADIUS_KM].sort_values('distance_km')
+        
+        # Limit to top 10 nearest stations for readability
+        MAX_STATIONS = 10
+        nearby_stations = nearby_stations.head(MAX_STATIONS)
+        
+        # Create figure
+        fig = go.Figure()
+        
+        if len(nearby_stations) == 0:
+            fig.update_layout(
+                title=f"No stations found within {RADIUS_KM} km of selected location",
+                template="plotly_white",
+                height=500,
+                xaxis_title="Date",
+                yaxis_title="Water Level (ft)",
+                font=dict(family="Arial, sans-serif", size=12)
+            )
+            return fig
+        
+        # Color palette for different stations
+        colors = [
+            '#2563eb', '#dc2626', '#16a34a', '#ca8a04', '#9333ea',
+            '#db2777', '#0891b2', '#ea580c', '#65a30d', '#7c3aed'
+        ]
+        
+        # Plot each nearby station
+        for idx, station_row in nearby_stations.iterrows():
+            site_code = station_row['STATION']
+            distance = station_row['distance_km']
+            
+            # Get time series data for this station
+            station_data = df[df['STATION'] == site_code].copy()
+            station_data = station_data.sort_values('MSMT_DATE')
+            
+            if len(station_data) > 0:
+                color_idx = list(nearby_stations.index).index(idx) % len(colors)
+                
+                fig.add_trace(go.Scatter(
+                    x=station_data['MSMT_DATE'],
+                    y=station_data['WSE'],
+                    mode='lines',
+                    name=f"{site_code} ({distance:.1f} km)",
+                    line=dict(color=colors[color_idx], width=2),
+                    hovertemplate=(
+                        f"<b>{site_code}</b><br>" +
+                        f"Distance: {distance:.1f} km<br>" +
+                        "Date: %{x|%Y-%m-%d}<br>" +
+                        "Water Level: %{y:.2f} ft<br>" +
+                        "<extra></extra>"
+                    )
+                ))
+        
+        # Update layout
+        fig.update_layout(
+            title=dict(
+                text=f"Water Levels at {len(nearby_stations)} Stations within {RADIUS_KM} km",
+                font=dict(size=16, color="#111827", family="Arial, sans-serif")
+            ),
+            xaxis=dict(
+                title="Date",
+                showgrid=True,
+                gridcolor="rgba(0,0,0,0.05)",
+                zeroline=False
+            ),
+            yaxis=dict(
+                title="Water Level (ft above sea level)",
+                showgrid=True,
+                gridcolor="rgba(0,0,0,0.05)",
+                zeroline=True,
+                zerolinecolor="rgba(0,0,0,0.2)",
+                zerolinewidth=1
+            ),
+            template="plotly_white",
+            height=500,
+            hovermode='x unified',
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.02,
+                bgcolor="rgba(255,255,255,0.9)",
+                bordercolor="rgba(0,0,0,0.1)",
+                borderwidth=1
+            ),
+            font=dict(family="Arial, sans-serif", size=12),
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="white",
+            margin=dict(l=60, r=200, t=50, b=50)
         )
         
         return fig
