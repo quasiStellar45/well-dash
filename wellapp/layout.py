@@ -583,7 +583,7 @@ layout = html.Div(
                                                 "display": "flex",
                                                 "justifyContent": "space-between",
                                                 "gap": "25px",
-                                                "marginbottom": "25px"
+                                                "marginBottom": "30px"
                                             }
                                         ),
                                         # Nearby stations plot

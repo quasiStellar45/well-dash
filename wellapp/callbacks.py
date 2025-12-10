@@ -177,7 +177,10 @@ def register_callbacks(app):
                 y=predictions_full,
                 mode='lines',
                 name='ML Prediction',
-                line=dict(color='red', dash='dash', width=2)
+                line=dict(color='red', dash='dash', width=2),
+                hovertemplate=(
+                    "<b>ML Prediction</b><br>: %{y:.2f} ft<br>"
+                )
             ))
             
             # Update title to show it includes predictions
@@ -196,7 +199,10 @@ def register_callbacks(app):
                 y=predictions_trend,
                 mode='lines',
                 name='ML Prediction',
-                line=dict(color='red', dash='dash', width=2)
+                line=dict(color='red', dash='dash', width=2),
+                hovertemplate=(
+                    "<b>ML Prediction: %{y:.2f} ft</b><br>"
+                )
             ))
             
             fig_trend.update_layout(showlegend=True)
@@ -223,8 +229,8 @@ def register_callbacks(app):
             showlegend=True,
             hovertemplate=(
                 "<b>%{hovertext}</b><br>"
-                "Lat: %{lat:.4f}<br>"
-                "Lon: %{lon:.4f}<br>"
+                "Latitude: %{lat:.4f}<br>"
+                "Longitude: %{lon:.4f}<br>"
                 "<extra></extra>"
             ),
             hovertext=stations_df["STATION"]
@@ -535,7 +541,6 @@ def register_callbacks(app):
                     hovertemplate=(
                         f"<b>{site_code}</b><br>" +
                         f"Distance: {distance:.1f} miles<br>" +
-                        "Date: %{x|%Y-%m-%d}<br>" +
                         "Water Level: %{y:.2f} ft<br>" +
                         f"Elevation: {stations_df.loc[stations_df.STATION == site_code, 'ELEV'].iloc[0].item()} ft<br>" +
                         f"Well Depth: {stations_df.loc[stations_df.STATION == site_code, 'WELL_DEPTH'].iloc[0].item()} ft<br>" +

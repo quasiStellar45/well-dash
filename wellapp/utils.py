@@ -83,34 +83,17 @@ def create_map(df: pd.DataFrame):
         color_discrete_map=color_map,
     )
 
-    # # Create an invisible grid that covers the dataframe bounding box
-    # lat_min, lat_max = df["LATITUDE"].min(), df["LATITUDE"].max()
-    # lon_min, lon_max = df["LONGITUDE"].min(), df["LONGITUDE"].max()
-
-    # # Small padding so the grid is definitely inside the viewport
-    # pad_lat = max(0.5, (lat_max - lat_min) * 0.1)
-    # pad_lon = max(0.5, (lon_max - lon_min) * 0.1)
-
-    # lats = np.linspace(lat_min - pad_lat, lat_max + pad_lat, 200)
-    # lons = np.linspace(lon_min - pad_lon, lon_max + pad_lon, 100)
-    # lat_grid, lon_grid = np.meshgrid(lats, lons)
-
-    # fig.add_densitymapbox(
-    #     lat=lat_grid.flatten(),
-    #     lon=lon_grid.flatten(),
-    #     z=np.zeros_like(lat_grid).flatten(),
-    #     radius=50,  # large so it fills the map
-    #     opacity=0,  # invisible
-    #     showscale=False,
-    #     hoverinfo="none",
-    # )
-
-    # Add the invisible trace (this appends it), then move it to the front safely
-    # fig.add_trace(invisible_layer)
-    # data_list = list(fig.data)
-    # move the last added trace to the front so it has click priority
-    # data_list.insert(0, data_list.pop(-1))
-    # fig.data = tuple(data_list)
+    # Update hover template
+    fig.update_traces(
+        hovertemplate=(
+            "<b>%{hovertext}</b><br>" +
+            "Latitude: %{lat:.4f}<br>" +
+            "Longitude: %{lon:.4f}<br>" +
+            "Elevation: %{customdata[1]:.0f} ft<br>" +
+            "Well Depth: %{customdata[2]:.0f} ft<br>" +
+            "<extra></extra>"
+            )
+    )
 
     fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
     return fig
@@ -124,25 +107,35 @@ def plot_station_data(df: pd.DataFrame, station_id: str):
         x='MSMT_DATE',
         y='WSE',
         hover_data={
-            'WSE_QC':True
+            'WSE_QC': True,
+            'MSMT_DATE': False,  # Hide to avoid duplication
+            'WSE': False  # Hide to avoid duplication
         },
-        )
-    
+    )
+
     # Change trace type and name for legend
-    fig.update_traces(mode="lines+markers", 
-                      name="Water Level Data",
-                      showlegend=True)
+    fig.update_traces(
+        mode="lines+markers", 
+        name="Water Level Data",
+        showlegend=True,
+        hovertemplate=(
+            "<b>Water Level Data</b><br>" +
+            "Water Level: %{y:.2f} ft<br>" +
+            "QC Flag: %{customdata[0]}<br>" +
+            "<extra></extra>"
+        )
+    )
 
     # Update figure options
     fig.update_layout(
         template="plotly_white",
         title=f"Water Level for Station {station_id}",
-        xaxis=dict(showline=True, linewidth=1, linecolor='black'),
-        yaxis=dict(showline=True, linewidth=1, linecolor='black'),
-        xaxis_title="Date",
-        yaxis_title="Water Surface Elevation (ft asl)",
-        showlegend=True
+        xaxis=dict(showline=True, linewidth=1, linecolor='black', title='Date'),
+        yaxis=dict(showline=True, linewidth=1, linecolor='black', title="Water Surface Elevation (ft asl)"),
+        showlegend=True,
+        hovermode='x unified'
     )
+
     return fig
 
 def determine_elevation_from_raster(long: float, lat: float):
@@ -227,7 +220,8 @@ def create_stl_plot(station_df):
         title='Trend Component',
         xaxis_title='Date',
         yaxis_title="Water Surface Elevation (ft asl)",
-        template='plotly_white'
+        template='plotly_white',
+        hovermode='x unified'
     )
 
     # Seasonal component
