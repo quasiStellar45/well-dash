@@ -112,7 +112,7 @@ def register_callbacks(app):
             predictions_full = []
             dates_full = []
             
-            ref_date = pd.Timestamp('1800-01-01')  # Adjust to model
+            ref_date = df_monthly['MSMT_DATE'].min()  # Adjust to model
             
             for date in date_range_full:
                 days_since_ref = (date - ref_date).days
@@ -125,8 +125,8 @@ def register_callbacks(app):
                     date.month,
                     date.year,
                     days_since_ref,
-                    np.sin(2 * np.pi * day_of_year / 365),  # day_sin
-                    np.cos(2 * np.pi * day_of_year / 365),  # day_cos
+                    np.sin(2 * np.pi * day_of_year / 365.25),  # day_sin
+                    np.cos(2 * np.pi * day_of_year / 365.25),  # day_cos
                     np.sin(2 * np.pi * date.month / 12),        # month_sin
                     np.cos(2 * np.pi * date.month / 12),        # month_cos
                     elevation,
@@ -157,8 +157,8 @@ def register_callbacks(app):
                     date.month,
                     date.year,
                     days_since_ref,
-                    np.sin(2 * np.pi * day_of_year / 365),
-                    np.cos(2 * np.pi * day_of_year / 365),
+                    np.sin(2 * np.pi * day_of_year / 365.25),
+                    np.cos(2 * np.pi * day_of_year / 365.25),
                     np.sin(2 * np.pi * date.month / 12),
                     np.cos(2 * np.pi * date.month / 12),
                     elevation,
@@ -385,7 +385,7 @@ def register_callbacks(app):
         
         predictions = []
         dates = []
-        ref_date = pd.Timestamp('1800-01-01')
+        ref_date = df_monthly['MSMT_DATE'].min()
         
         for date in date_range:
             days_since_ref = (date - ref_date).days
@@ -398,8 +398,8 @@ def register_callbacks(app):
                 date.month,
                 date.year,
                 days_since_ref,
-                np.sin(2 * np.pi * day_of_year / 365),
-                np.cos(2 * np.pi * day_of_year / 365),
+                np.sin(2 * np.pi * day_of_year / 365.25),
+                np.cos(2 * np.pi * day_of_year / 365.25),
                 np.sin(2 * np.pi * date.month / 12),
                 np.cos(2 * np.pi * date.month / 12),
                 elevation,
@@ -479,7 +479,7 @@ def register_callbacks(app):
         stations = stations_df[['STATION', 'LATITUDE', 'LONGITUDE']].drop_duplicates()
         
         # Calculate distance to each station
-        stations['distance_km'] = stations.apply(
+        stations['distance_miles'] = stations.apply(
             lambda row: utils.calculate_distance(
                 clicked_lat, clicked_lon, 
                 row['LATITUDE'], row['LONGITUDE']
@@ -487,12 +487,12 @@ def register_callbacks(app):
             axis=1
         )
         
-        # Filter stations within radius (e.g., 50 km)
-        RADIUS_KM = 50
-        nearby_stations = stations[stations['distance_km'] <= RADIUS_KM].sort_values('distance_km')
+        # Filter stations within radius
+        RADIUS_MILES = 20
+        nearby_stations = stations[stations['distance_miles'] <= RADIUS_MILES].sort_values('distance_miles')
         
-        # Limit to top 10 nearest stations for readability
-        MAX_STATIONS = 10
+        # Limit to top 5 nearest stations for readability
+        MAX_STATIONS = 5
         nearby_stations = nearby_stations.head(MAX_STATIONS)
         
         # Create figure
@@ -500,7 +500,7 @@ def register_callbacks(app):
         
         if len(nearby_stations) == 0:
             fig.update_layout(
-                title=f"No stations found within {RADIUS_KM} km of selected location",
+                title=f"No stations found within {RADIUS_MILES} miles of selected location",
                 template="plotly_white",
                 height=500,
                 xaxis_title="Date",
@@ -512,13 +512,12 @@ def register_callbacks(app):
         # Color palette for different stations
         colors = [
             '#2563eb', '#dc2626', '#16a34a', '#ca8a04', '#9333ea',
-            '#db2777', '#0891b2', '#ea580c', '#65a30d', '#7c3aed'
         ]
         
         # Plot each nearby station
         for idx, station_row in nearby_stations.iterrows():
             site_code = station_row['STATION']
-            distance = station_row['distance_km']
+            distance = station_row['distance_miles']
             
             # Get time series data for this station
             station_data = df[df['STATION'] == site_code].copy()
@@ -531,13 +530,15 @@ def register_callbacks(app):
                     x=station_data['MSMT_DATE'],
                     y=station_data['WSE'],
                     mode='lines',
-                    name=f"{site_code} ({distance:.1f} km)",
+                    name=f"{site_code} ({distance:.1f} miles)",
                     line=dict(color=colors[color_idx], width=2),
                     hovertemplate=(
                         f"<b>{site_code}</b><br>" +
-                        f"Distance: {distance:.1f} km<br>" +
+                        f"Distance: {distance:.1f} miles<br>" +
                         "Date: %{x|%Y-%m-%d}<br>" +
                         "Water Level: %{y:.2f} ft<br>" +
+                        f"Elevation: {stations_df.loc[stations_df.STATION == site_code, 'ELEV'].iloc[0].item()} ft<br>" +
+                        f"Well Depth: {stations_df.loc[stations_df.STATION == site_code, 'WELL_DEPTH'].iloc[0].item()} ft<br>" +
                         "<extra></extra>"
                     )
                 ))
@@ -545,7 +546,7 @@ def register_callbacks(app):
         # Update layout
         fig.update_layout(
             title=dict(
-                text=f"Water Levels at {len(nearby_stations)} Stations within {RADIUS_KM} km",
+                text=f"Water Levels at {len(nearby_stations)} Stations within {RADIUS_MILES} miles",
                 font=dict(size=16, color="#111827", family="Arial, sans-serif")
             ),
             xaxis=dict(

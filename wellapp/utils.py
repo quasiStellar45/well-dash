@@ -147,14 +147,15 @@ def plot_station_data(df: pd.DataFrame, station_id: str):
 
 def determine_elevation_from_raster(long: float, lat: float):
     """Determines the elevation from 3DEP data at a lat and long provided."""
+    m_to_ft = 3.28
     surface_elevation = py3dep.elevation_bycoords(
         [(long, lat)],
         crs=4326
     )
 
-    return surface_elevation
+    return round(surface_elevation * m_to_ft, 2)
 
-def load_ml_model(model_name = "wl_xgb_model.json"):
+def load_ml_model(model_name = "wl_xgb_model_2.json"):
     """Load a XGBoost ml model."""
     loaded_model = xgb.XGBRegressor()
     loaded_model.load_model(model_name)
@@ -325,7 +326,7 @@ def generate_ml_predictions(station_id, station_df, stations_df, model):
 def calculate_distance(lat1, lon1, lat2, lon2):
     """
     Calculate distance between two points using Haversine formula.
-    Returns distance in kilometers.
+    Returns distance in miles.
     """
     # Convert to radians
     lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
@@ -338,4 +339,5 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     
     # Radius of Earth in kilometers
     r = 6371
-    return c * r
+    km_to_miles = 1.609344
+    return c * r / km_to_miles
