@@ -93,15 +93,72 @@ def register_callbacks(app):
             fig = utils.plot_station_data(df, station_id)
         
             # Generate ML prediction for main plot (extends to now)
+<<<<<<< HEAD
             predictions_full, dates_full = utils.generate_ml_predictions(station_id, station_df, stations_df, df_monthly, model)
+=======
+            end_date = pd.Timestamp.now()
+            date_range_full = pd.date_range(start=start_date, end=end_date, freq='ME')
+            
+            predictions_full = []
+            dates_full = []
+            
+            ref_date = df_monthly['MSMT_DATE'].min()  # Adjust to model
+            
+            for date in date_range_full:
+                days_since_ref = (date - ref_date).days
+                day_of_year = date.dayofyear
+                
+                # Create feature vector matching your training columns
+                X = np.array([[
+                    station_encoded,
+                    date.day,
+                    date.month,
+                    date.year,
+                    days_since_ref,
+                    np.sin(2 * np.pi * day_of_year / 365.25),  # day_sin
+                    np.cos(2 * np.pi * day_of_year / 365.25),  # day_cos
+                    np.sin(2 * np.pi * date.month / 12),        # month_sin
+                    np.cos(2 * np.pi * date.month / 12),        # month_cos
+                    elevation,
+                    lat,
+                    lon,
+                    well_depth
+                ]])
+                
+                pred = model.predict(X)[0]
+                predictions_full.append(pred)
+                dates_full.append(date)
+>>>>>>> 5d9c386 (small edits to units)
             
             # Generate ML prediction for trend plot (only up to last data point)
             station_df_monthly = df_monthly.loc[df_monthly.STATION == station_id, ['MSMT_DATE','WSE']]
             last_data_date = station_df_monthly['MSMT_DATE'].max()
             date_range_trend = pd.date_range(start=dates_full[0], end=last_data_date, freq='ME')
                 
+<<<<<<< HEAD
             predictions_trend = predictions_full[0:len(date_range_trend)]
             dates_trend = dates_full[0:len(date_range_trend)]
+=======
+                X = np.array([[
+                    station_encoded,
+                    date.day,
+                    date.month,
+                    date.year,
+                    days_since_ref,
+                    np.sin(2 * np.pi * day_of_year / 365.25),
+                    np.cos(2 * np.pi * day_of_year / 365.25),
+                    np.sin(2 * np.pi * date.month / 12),
+                    np.cos(2 * np.pi * date.month / 12),
+                    elevation,
+                    lat,
+                    lon,
+                    well_depth
+                ]])
+                
+                pred = model.predict(X)[0]
+                predictions_trend.append(pred)
+                dates_trend.append(date)
+>>>>>>> 5d9c386 (small edits to units)
             
             # Add prediction trace to main figure (full range)
             fig.add_trace(go.Scatter(
@@ -470,6 +527,10 @@ def register_callbacks(app):
                     hovertemplate=(
                         f"<b>{site_code}</b><br>" +
                         f"Distance: {distance:.1f} miles<br>" +
+<<<<<<< HEAD
+=======
+                        "Date: %{x|%Y-%m-%d}<br>" +
+>>>>>>> 5d9c386 (small edits to units)
                         "Water Level: %{y:.2f} ft<br>" +
                         f"Elevation: {stations_df.loc[stations_df.STATION == site_code, 'ELEV'].iloc[0].item()} ft<br>" +
                         f"Well Depth: {stations_df.loc[stations_df.STATION == site_code, 'WELL_DEPTH'].iloc[0].item()} ft<br>" +
