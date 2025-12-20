@@ -13,6 +13,7 @@ import numpy as np
 import plotly.graph_objects as go
 from statsmodels.tsa.statespace.structural import UnobservedComponents
 from statsmodels.tsa.seasonal import STL
+import datetime 
 
 def load_kaggle_data(file_name, data_handle):
     """
@@ -83,6 +84,14 @@ def create_map(df: pd.DataFrame):
         color_discrete_map=color_map,
     )
 
+    # Edit hover box style
+    for trace in fig.data:
+        trace.hoverlabel = dict(
+            bgcolor="white",
+            bordercolor=trace.marker.color,
+            font=dict(color="black")
+        )
+
     # Update hover template
     fig.update_traces(
         hovertemplate=(
@@ -95,7 +104,18 @@ def create_map(df: pd.DataFrame):
             )
     )
 
-    fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+    # Update layout to move legend to bottom
+    fig.update_layout(
+        margin={"r":0,"t":0,"l":0,"b":0},
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.15,
+            xanchor="center",
+            x=0.5
+        )
+    )
+    
     return fig
 
 def plot_station_data(df: pd.DataFrame, station_id: str):
@@ -119,7 +139,6 @@ def plot_station_data(df: pd.DataFrame, station_id: str):
         name="Water Level Data",
         showlegend=True,
         hovertemplate=(
-            "<b>Water Level Data</b><br>" +
             "Water Level: %{y:.2f} ft<br>" +
             "QC Flag: %{customdata[0]}<br>" +
             "<extra></extra>"
@@ -231,13 +250,17 @@ def create_stl_plot(station_df):
         y=res_stl.seasonal,
         mode='lines',
         name='Seasonal',
-        line=dict(color='magenta')
+        line=dict(color='magenta'),
+        hovertemplate=(
+            "%{y:.2f}"
+        )
     ))
     fig_seasonal.update_layout(
         title='Seasonal Component',
         xaxis_title='Date',
         yaxis_title="Seasonal Variation (ft)",
-        template='plotly_white'
+        template='plotly_white',
+        hovermode='x unified'
     )
 
     # Residual component
@@ -247,13 +270,17 @@ def create_stl_plot(station_df):
         y=res_stl.resid,
         mode='lines',
         name='Residual',
-        line=dict(color='brown')
+        line=dict(color='brown'),
+        hovertemplate=(
+            "%{y:.2f}"
+        )
     ))
     fig_resid.update_layout(
         title='Residual Component',
         xaxis_title='Date',
         yaxis_title="Residual (ft)",
-        template='plotly_white'
+        template='plotly_white',
+        hovermode='x unified'
     )
 
     return fig_trend, fig_seasonal, fig_resid
@@ -270,7 +297,7 @@ def create_empty_fig(title, yaxis_title, xaxis_title="Date"):
     )
     return fig
 
-def generate_ml_predictions(station_id, station_df, stations_df, model):
+def generate_ml_predictions(station_id, station_df, stations_df, monthly_df, model):
     """Generate ML predictions for a station."""
     le = load_encoder()
     
@@ -289,7 +316,7 @@ def generate_ml_predictions(station_id, station_df, stations_df, model):
     
     predictions = []
     dates = []
-    ref_date = pd.Timestamp('1800-01-01')
+    ref_date = monthly_df["MSMT_DATE"].min()
     
     for date in date_range:
         days_since_ref = (date - ref_date).days
@@ -335,3 +362,75 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     r = 6371
     km_to_miles = 1.609344
     return c * r / km_to_miles
+
+def add_map_marker(fig, click_data):
+    fig.add_trace(go.Scattermapbox(
+        lat=[click_data["lat"]],
+        lon=[click_data["lon"]],
+        mode='markers',
+        marker=dict(size=15, color='red', symbol='circle'),
+        name='Selected Location',
+        showlegend=True,
+        hovertemplate=(
+            f"<b>Selected Location</b><br>"
+            f"Latitude: {click_data['lat']:.4f}<br>"
+            f"Longitude: {click_data['lon']:.4f}<br>"
+            f"Elevation: {click_data.get('elevation', 'N/A')} ft<br>"
+            "<extra></extra>"
+        )
+    ))
+
+def generate_ml_prediction(station_encoded, date: datetime.date, elevation: float, lat: float, lon: float, 
+                           well_depth: float, start_date: datetime.date, ref_date: datetime.date, model):
+    """
+    Docstring for generate_ml_prediction
+    
+    :param station_encoded: Encoded station name.
+    :param date: Date for measurement
+    :type date: datetime.date
+    :param elevation: Surface elevation of well.
+    :type elevation: float
+    :param lat: Latitude of the well.
+    :type lat: float
+    :param lon: Longitude of the well.
+    :type lon: float
+    :param well_depth: Depth of the well.
+    :type well_depth: float
+    :param start_date: Start date for prediction
+    :type start_date: datetime.date
+    :param ref_date: Reference date for ml model
+    :type ref_date: datetime.date
+    :param model: ml model.
+    """
+    end_date = pd.Timestamp.now()
+    date_range_full = pd.date_range(start=start_date, end=end_date, freq='ME')
+    
+    predictions_full = []
+    dates_full = []
+    
+    for date in date_range_full:
+        days_since_ref = (date - ref_date).days
+        day_of_year = date.dayofyear
+        
+        # Create feature vector matching your training columns
+        X = np.array([[
+            station_encoded,
+            date.day,
+            date.month,
+            date.year,
+            days_since_ref,
+            np.sin(2 * np.pi * day_of_year / 365.25),  # day_sin
+            np.cos(2 * np.pi * day_of_year / 365.25),  # day_cos
+            np.sin(2 * np.pi * date.month / 12),        # month_sin
+            np.cos(2 * np.pi * date.month / 12),        # month_cos
+            elevation,
+            lat,
+            lon,
+            well_depth
+        ]])
+        
+        pred = model.predict(X)[0]
+        predictions_full.append(pred)
+        dates_full.append(date)
+
+        return predictions_full, dates_full

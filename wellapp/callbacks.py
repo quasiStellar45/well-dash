@@ -106,38 +106,8 @@ def register_callbacks(app):
             start_date = station_df['MSMT_DATE'].min()
         
             # Generate ML prediction for main plot (extends to now)
-            end_date = pd.Timestamp.now()
-            date_range_full = pd.date_range(start=start_date, end=end_date, freq='ME')
-            
-            predictions_full = []
-            dates_full = []
-            
-            ref_date = df_monthly['MSMT_DATE'].min()  # Adjust to model
-            
-            for date in date_range_full:
-                days_since_ref = (date - ref_date).days
-                day_of_year = date.dayofyear
-                
-                # Create feature vector matching your training columns
-                X = np.array([[
-                    station_encoded,
-                    date.day,
-                    date.month,
-                    date.year,
-                    days_since_ref,
-                    np.sin(2 * np.pi * day_of_year / 365.25),  # day_sin
-                    np.cos(2 * np.pi * day_of_year / 365.25),  # day_cos
-                    np.sin(2 * np.pi * date.month / 12),        # month_sin
-                    np.cos(2 * np.pi * date.month / 12),        # month_cos
-                    elevation,
-                    lat,
-                    lon,
-                    well_depth
-                ]])
-                
-                pred = model.predict(X)[0]
-                predictions_full.append(pred)
-                dates_full.append(date)
+            ref_date = df_monthly["MSMT_DATE"].min()
+            predictions_full, dates_full = utils.generate_ml_predictions(station_id, station_df, stations_df, df_monthly, model)
             
             # Generate ML prediction for trend plot (only up to last data point)
             station_df_monthly = df_monthly.loc[df_monthly.STATION == station_id, ['MSMT_DATE','WSE']]
@@ -179,7 +149,7 @@ def register_callbacks(app):
                 name='ML Prediction',
                 line=dict(color='red', dash='dash', width=2),
                 hovertemplate=(
-                    "<b>ML Prediction</b><br>: %{y:.2f} ft<br>"
+                    "%{y:.2f} ft"
                 )
             ))
             
@@ -191,7 +161,12 @@ def register_callbacks(app):
             )
 
             # Create STL plots
-            fig_trend, fig_seasonal, fig_resid = utils.create_stl_plot(station_df_monthly)
+            try:
+                fig_trend, fig_seasonal, fig_resid = utils.create_stl_plot(station_df_monthly)
+            except ValueError:
+                fig_trend = utils.create_empty_fig("Trend Component", "Water Surface Elevation (ft asl)")
+                fig_seasonal = utils.create_empty_fig("Seasonal Component", "Seasonal Variation (ft)")
+                fig_resid = utils.create_empty_fig("Residual Component", "Residual (ft)")
             
             # Add ML prediction to trend plot (only up to last data point)
             fig_trend.add_trace(go.Scatter(
@@ -201,13 +176,19 @@ def register_callbacks(app):
                 name='ML Prediction',
                 line=dict(color='red', dash='dash', width=2),
                 hovertemplate=(
-                    "<b>ML Prediction: %{y:.2f} ft</b><br>"
+                    "%{y:.2f}"
                 )
             ))
             
             fig_trend.update_layout(showlegend=True)
-        
-        return fig, fig_trend, fig_seasonal, fig_resid
+        try:
+            return fig, fig_trend, fig_seasonal, fig_resid
+        except UnboundLocalError:
+            fig = utils.create_empty_fig(f"No data for {station_id} for this data frequency.", "Water Surface Elevation (ft asl)")
+            fig_trend = utils.create_empty_fig("Trend Component", "Water Surface Elevation (ft asl)")
+            fig_seasonal = utils.create_empty_fig("Seasonal Component", "Seasonal Variation (ft)")
+            fig_resid = utils.create_empty_fig("Residual Component", "Residual (ft)")
+            return fig, fig_trend, fig_seasonal, fig_resid
     
     # Create spatial prediction map with station markers as reference
     @app.callback(
@@ -260,21 +241,7 @@ def register_callbacks(app):
         
         # If a location has been clicked, add a marker for it (on top)
         if click_data:
-            fig.add_trace(go.Scattermapbox(
-                lat=[click_data["lat"]],
-                lon=[click_data["lon"]],
-                mode='markers',
-                marker=dict(size=15, color='red', symbol='circle'),
-                name='Selected Location',
-                showlegend=True,
-                hovertemplate=(
-                    f"<b>Selected Location</b><br>"
-                    f"Latitude: {click_data['lat']:.4f}<br>"
-                    f"Longitude: {click_data['lon']:.4f}<br>"
-                    f"Elevation: {click_data.get('elevation', 'N/A')} ft<br>"
-                    "<extra></extra>"
-                )
-            ))
+            utils.add_map_marker(fig, click_data)
         
         # Set map center and zoom
         center_lat = (lat_min + lat_max) / 2
