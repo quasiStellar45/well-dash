@@ -361,7 +361,6 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     # Radius of Earth in kilometers
     r = 6371
     km_to_miles = 1.609344
-<<<<<<< HEAD
     return c * r / km_to_miles
 
 def add_map_marker(fig, click_data):
@@ -380,6 +379,3 @@ def add_map_marker(fig, click_data):
             "<extra></extra>"
         )
     ))
-=======
-    return c * r / km_to_miles
->>>>>>> 5d9c386 (small edits to units)
