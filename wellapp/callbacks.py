@@ -86,60 +86,22 @@ def register_callbacks(app):
         elif freq == "monthly":
             df = df_monthly
         
-        # Variables to store location info for ML prediction
-        lat, lon, elevation, well_depth = None, None, None, None
-        le = utils.load_encoder()
-        
         # If a real station was selected, add real data AND get its info for ML
         station_df = df.loc[df.STATION == station_id]
         if not station_df.empty:
             # Plot real station data
             fig = utils.plot_station_data(df, station_id)
-            
-            # Get station info for ML prediction
-            station_info = stations_df.loc[stations_df.STATION == station_id].iloc[0]
-            lat = station_info['LATITUDE']
-            lon = station_info['LONGITUDE']
-            elevation = station_info['ELEV']
-            well_depth = station_info['WELL_DEPTH']
-            station_encoded = utils.encode_station(station_id, le)
-            start_date = station_df['MSMT_DATE'].min()
         
             # Generate ML prediction for main plot (extends to now)
-            ref_date = df_monthly["MSMT_DATE"].min()
             predictions_full, dates_full = utils.generate_ml_predictions(station_id, station_df, stations_df, df_monthly, model)
             
             # Generate ML prediction for trend plot (only up to last data point)
             station_df_monthly = df_monthly.loc[df_monthly.STATION == station_id, ['MSMT_DATE','WSE']]
             last_data_date = station_df_monthly['MSMT_DATE'].max()
-            date_range_trend = pd.date_range(start=start_date, end=last_data_date, freq='ME')
-            
-            predictions_trend = []
-            dates_trend = []
-            
-            for date in date_range_trend:
-                days_since_ref = (date - ref_date).days
-                day_of_year = date.dayofyear
+            date_range_trend = pd.date_range(start=dates_full[0], end=last_data_date, freq='ME')
                 
-                X = np.array([[
-                    station_encoded,
-                    date.day,
-                    date.month,
-                    date.year,
-                    days_since_ref,
-                    np.sin(2 * np.pi * day_of_year / 365.25),
-                    np.cos(2 * np.pi * day_of_year / 365.25),
-                    np.sin(2 * np.pi * date.month / 12),
-                    np.cos(2 * np.pi * date.month / 12),
-                    elevation,
-                    lat,
-                    lon,
-                    well_depth
-                ]])
-                
-                pred = model.predict(X)[0]
-                predictions_trend.append(pred)
-                dates_trend.append(date)
+            predictions_trend = predictions_full[0:len(date_range_trend)]
+            dates_trend = dates_full[0:len(date_range_trend)]
             
             # Add prediction trace to main figure (full range)
             fig.add_trace(go.Scatter(
