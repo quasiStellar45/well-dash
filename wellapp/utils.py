@@ -50,11 +50,6 @@ def load_data():
 
     return df_daily, df_monthly, quality_codes, stations_df
 
-def get_columns(df):
-    cols = df.columns
-    return cols
-
-
 def create_map(df: pd.DataFrame):
     """Function to create the map plot."""
 
