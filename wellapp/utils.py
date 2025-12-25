@@ -113,7 +113,8 @@ def create_map(df: pd.DataFrame):
             y=-0.15,
             xanchor="center",
             x=0.5
-        )
+        ),
+        legend_title_text="Station Selection"
     )
     
     return fig
@@ -311,50 +312,69 @@ def create_empty_fig(title, yaxis_title, xaxis_title="Date"):
     )
     return fig
 
-def generate_ml_predictions(station_id, station_df, stations_df, monthly_df, model):
+def generate_ml_predictions(station_id=None, station_df=None, stations_df=None, monthly_df=None, model=None, 
+                            click_data=None, well_depth=None):
     """Generate ML predictions for a station."""
-    le = load_encoder()
+    if click_data:
+        # Load data from map click
+        lat = click_data["lat"]
+        lon = click_data["lon"]
+        elevation = click_data.get("elevation", 0)
+
+        # Start date of 2000 for spatial clicks
+        start_date = pd.Timestamp("2000-01-01")
+        
+        station_encoded = 0  # or use mean encoding for unknown stations
+    else:
+        # Load label encoder for station names
+        le = load_encoder()
     
-    # Get station info
-    station_info = stations_df.loc[stations_df.STATION == station_id].iloc[0]
-    lat = station_info['LATITUDE']
-    lon = station_info['LONGITUDE']
-    elevation = station_info['ELEV']
-    well_depth = station_info['WELL_DEPTH']
-    station_encoded = encode_station(station_id, le)
+        # Get station info
+        station_info = stations_df.loc[stations_df.STATION == station_id].iloc[0]
+        lat = station_info['LATITUDE']
+        lon = station_info['LONGITUDE']
+        elevation = station_info['ELEV']
+        well_depth = station_info['WELL_DEPTH']
+        station_encoded = encode_station(station_id, le)
+        start_date = station_df['MSMT_DATE'].min()
     
     # Create date range
-    start_date = station_df['MSMT_DATE'].min()
     end_date = pd.Timestamp.now()
-    date_range = pd.date_range(start=start_date, end=end_date, freq='ME')
+    dates = pd.date_range(start=start_date, end=end_date, freq='ME')
     
-    predictions = []
-    dates = []
     ref_date = monthly_df["MSMT_DATE"].min()
-    
-    for date in date_range:
-        days_since_ref = (date - ref_date).days
-        day_of_year = date.dayofyear
-        
-        X = np.array([[
-            station_encoded,
-            date.day,
-            date.month,
-            date.year,
-            days_since_ref,
-            np.sin(2 * np.pi * day_of_year / 365),
-            np.cos(2 * np.pi * day_of_year / 365),
-            np.sin(2 * np.pi * date.month / 12),
-            np.cos(2 * np.pi * date.month / 12),
-            elevation,
-            lat,
-            lon,
-            well_depth
-        ]])
-        
-        pred = model.predict(X)[0]
-        predictions.append(pred)
-        dates.append(date)
+
+    days_since_ref = (dates - ref_date).days.values
+    day_of_year = dates.dayofyear.values
+    month = dates.month.values
+    year = dates.year.values
+    day = dates.day.values
+
+    sin_doy = np.sin(2 * np.pi * day_of_year / 365)
+    cos_doy = np.cos(2 * np.pi * day_of_year / 365)
+    sin_month = np.sin(2 * np.pi * month / 12)
+    cos_month = np.cos(2 * np.pi * month / 12)
+
+    n = len(dates)
+
+    # --- Feature matrix ---
+    X = np.column_stack([
+        np.full(n, station_encoded),
+        day,
+        month,
+        year,
+        days_since_ref,
+        sin_doy,
+        cos_doy,
+        sin_month,
+        cos_month,
+        np.full(n, elevation),
+        np.full(n, lat),
+        np.full(n, lon),
+        np.full(n, well_depth),
+    ])
+
+    predictions = model.predict(X)
     
     return predictions, dates
 

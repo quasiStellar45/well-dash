@@ -126,6 +126,7 @@ def register_callbacks(app):
             try:
                 fig_trend, fig_seasonal, fig_resid = utils.create_stl_plot(station_df_monthly)
             except ValueError:
+                fig = utils.create_empty_fig(f"No data for {station_id} for this data frequency.", "Water Surface Elevation (ft asl)")
                 fig_trend = utils.create_empty_fig("Trend Component", "Water Surface Elevation (ft asl)")
                 fig_seasonal = utils.create_empty_fig("Seasonal Component", "Seasonal Variation (ft)")
                 fig_resid = utils.create_empty_fig("Residual Component", "Residual (ft)")
@@ -312,47 +313,12 @@ def register_callbacks(app):
                 "Water Surface Elevation (ft asl)"
             )
         
+        # Load data from map click
         lat = click_data["lat"]
         lon = click_data["lon"]
-        elevation = click_data.get("elevation", 0)
         
-        # Use a dummy station ID for encoding
-        le = utils.load_encoder()
-        station_encoded = 0  # or use mean encoding for unknown stations
-        
-        # Generate predictions from 2000 to now
-        start_date = pd.Timestamp('2000-01-01')
-        end_date = pd.Timestamp.now()
-        date_range = pd.date_range(start=start_date, end=end_date, freq='ME')
-        
-        predictions = []
-        dates = []
-        ref_date = df_monthly['MSMT_DATE'].min()
-        
-        for date in date_range:
-            days_since_ref = (date - ref_date).days
-            day_of_year = date.dayofyear
-            
-            # Create feature vector
-            X = np.array([[
-                station_encoded,
-                date.day,
-                date.month,
-                date.year,
-                days_since_ref,
-                np.sin(2 * np.pi * day_of_year / 365.25),
-                np.cos(2 * np.pi * day_of_year / 365.25),
-                np.sin(2 * np.pi * date.month / 12),
-                np.cos(2 * np.pi * date.month / 12),
-                elevation,
-                lat,
-                lon,
-                well_depth
-            ]])
-            
-            pred = model.predict(X)[0]
-            predictions.append(pred)
-            dates.append(date)
+        # Generate ml predictions for click location
+        predictions, dates = utils.generate_ml_predictions(monthly_df=df_monthly, model=model, click_data=click_data, well_depth=well_depth)
         
         # Create plot
         fig = go.Figure()
