@@ -90,7 +90,7 @@ def register_callbacks(app):
         station_df = df.loc[df.STATION == station_id]
         if not station_df.empty:
             # Plot real station data
-            fig = utils.plot_station_data(df, station_id)
+            fig = utils.plot_station_data(df, station_id, quality_codes)
         
             # Generate ML prediction for main plot (extends to now)
             predictions_full, dates_full = utils.generate_ml_predictions(station_id, station_df, stations_df, df_monthly, model)
@@ -217,7 +217,14 @@ def register_callbacks(app):
             ),
             margin={"r":0,"t":0,"l":0,"b":0},
             showlegend=True,
-            height=600
+            height=600,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.15,
+                xanchor="center",
+                x=0.5
+            )
         )
         
         return fig

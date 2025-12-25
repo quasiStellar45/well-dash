@@ -118,16 +118,23 @@ def create_map(df: pd.DataFrame):
     
     return fig
 
-def plot_station_data(df: pd.DataFrame, station_id: str):
+def plot_station_data(df: pd.DataFrame, station_id: str, quality_codes: pd.DataFrame):
     """Plots the data for the selected station."""
     # Locate the data for the station
     df = df.copy().loc[df.STATION == station_id]
+
+    # Map QC codes to descriptions
+    qc_map = dict(
+        zip(quality_codes["QUALITY_CODE"], quality_codes["DESCRIPTION"])
+    )
+    df["QC_DESC"] = df["WSE_QC"].map(qc_map)
+
     fig = px.scatter(
         df,
         x='MSMT_DATE',
         y='WSE',
         hover_data={
-            'WSE_QC': True,
+            "QC_DESC": True,
             'MSMT_DATE': False,  # Hide to avoid duplication
             'WSE': False  # Hide to avoid duplication
         },
@@ -167,7 +174,7 @@ def determine_elevation_from_raster(long: float, lat: float):
 
     return round(surface_elevation * m_to_ft, 2)
 
-def load_ml_model(model_name = "wl_xgb_model.json"):
+def load_ml_model(model_name = "wl_xgb_model_2.bin"):
     """Load a XGBoost ml model."""
     loaded_model = xgb.XGBRegressor()
     loaded_model.load_model(model_name)
@@ -286,6 +293,13 @@ def create_stl_plot(station_df):
     return fig_trend, fig_seasonal, fig_resid
 
 def create_empty_fig(title, yaxis_title, xaxis_title="Date"):
+    """
+    Creates and empty figure.
+    
+    :param title: Figure title
+    :param yaxis_title: Title of y-axis
+    :param xaxis_title: Title of x-axis
+    """
     fig = go.Figure()
     fig.update_layout(
         template="plotly_white",
