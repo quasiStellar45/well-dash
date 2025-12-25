@@ -13,7 +13,6 @@ import numpy as np
 import plotly.graph_objects as go
 from statsmodels.tsa.statespace.structural import UnobservedComponents
 from statsmodels.tsa.seasonal import STL
-import datetime 
 
 def load_kaggle_data(file_name, data_handle):
     """
@@ -229,14 +228,14 @@ def create_stl_plot(station_df):
         y=filled,
         mode='lines',
         name='Unobserved Estimation',
-        line=dict(color='green', dash='dash')
+        line=dict(color='green')
     ))
     fig_trend.add_trace(go.Scatter(
         x=filled.index,
         y=res_stl.trend,
         mode='lines',
-        name='Trend',
-        line=dict(color='orange', dash='dash')
+        name='Unobserved Trend',
+        line=dict(color='green', dash='dash')
     ))
     fig_trend.update_layout(
         title='Trend Component',

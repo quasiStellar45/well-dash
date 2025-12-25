@@ -4,8 +4,8 @@ import plotly.graph_objects as go
 import wellapp.utils as utils
 import pandas as pd
 import numpy as np
-from dash import dcc, html, State
-import plotly.express as px
+from dash import html, State
+from statsmodels.tsa.seasonal import STL
 
 def register_callbacks(app):
     # Load the data
@@ -137,13 +137,50 @@ def register_callbacks(app):
                 y=predictions_trend,
                 mode='lines',
                 name='ML Prediction',
-                line=dict(color='red', dash='dash', width=2),
+                line=dict(color='red', width=2),
                 hovertemplate=(
                     "%{y:.2f}"
                 )
             ))
             
             fig_trend.update_layout(showlegend=True)
+
+            # Add the ML STL decomps to plot
+            stl_ml = STL(predictions_trend, period=13)
+            res_stl_ml = stl_ml.fit()
+
+            # ML Trend
+            fig_trend.add_trace(go.Scatter(
+                x=dates_trend,
+                y=res_stl_ml.trend,
+                mode='lines',
+                name='ML Trend',
+                line=dict(color='red', dash='dash')
+            ))
+
+            # ML Seasonal
+            fig_seasonal.add_trace(go.Scatter(
+                x=dates_trend,
+                y=res_stl_ml.seasonal,
+                mode='lines',
+                name='ML Seasonal',
+                line=dict(color='red', dash='dash'),
+                hovertemplate=(
+                    "%{y:.2f}"
+                )
+            ))
+
+            # ML Residual
+            fig_resid.add_trace(go.Scatter(
+                x=dates_trend,
+                y=res_stl_ml.resid,
+                mode='lines',
+                name='ML Residual',
+                line=dict(color='purple', dash='dash'),
+                hovertemplate=(
+                    "%{y:.2f}"
+                )
+            ))
         try:
             return fig, fig_trend, fig_seasonal, fig_resid
         except UnboundLocalError:
