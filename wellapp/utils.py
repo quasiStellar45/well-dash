@@ -169,7 +169,7 @@ def determine_elevation_from_raster(long: float, lat: float):
 
     return round(surface_elevation * m_to_ft, 2)
 
-def load_ml_model(model_name = "wl_xgb_model_2.bin"):
+def load_ml_model(model_name = "wl_xgb_model_3.bin"):
     """Load a XGBoost ml model."""
     loaded_model = xgb.XGBRegressor()
     loaded_model.load_model(model_name)
@@ -204,7 +204,7 @@ def create_stl_plot(station_df):
     y = df_test['WSE']
 
     # Fit UnobservedComponents model
-    mod = UnobservedComponents(y, level='local level', seasonal=13)
+    mod = UnobservedComponents(y, level='local level', seasonal=12)
     res_ucm = mod.fit()
 
     # Get smoothed level as a Series with correct index
