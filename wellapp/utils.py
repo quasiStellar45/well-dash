@@ -13,6 +13,8 @@ import numpy as np
 import plotly.graph_objects as go
 from statsmodels.tsa.statespace.structural import UnobservedComponents
 from statsmodels.tsa.seasonal import STL
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, ExpSineSquared, WhiteKernel
 
 def load_kaggle_data(file_name, data_handle):
     """
@@ -406,4 +408,71 @@ def add_map_marker(fig, click_data):
             f"Elevation: {click_data.get('elevation', 'N/A')} ft<br>"
             "<extra></extra>"
         )
+    ))
+
+def generate_gsp(data : pd.DataFrame, date_range):
+    """
+    Generates a gaussian process for the station data
+    
+    :param data: dataframe with waterlevel and date.
+    """
+    # Clean data
+    data = data.copy()[['MSMT_DATE', 'WSE']].dropna()
+    # Generate the train set
+    t0 = data["MSMT_DATE"].min() # Need to enter into training as timedelta
+    X = ((data["MSMT_DATE"] - t0) / np.timedelta64(1, "D")).to_numpy().reshape(-1, 1)
+    y = data['WSE'].to_numpy()
+
+    n_split = int(1*len(X)) # Split so the data is trained on the first 80% of waterlevels
+    x_train = X[:n_split]
+    y_train = y[:n_split]
+
+    # Create Gaussian Process model
+    kernel = (
+        1.0 * ExpSineSquared(periodicity=365.0) +
+        1.0 * RBF(length_scale=1.0) 
+        #WhiteKernel(noise_level=0.01)
+    )
+    gsp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=9)
+    model = gsp.fit(x_train, y_train)
+
+    # Prediction for the entire dataset
+    X_pred = ((date_range - t0) / np.timedelta64(1, "D")).to_numpy().reshape(-1, 1)
+    gsp_pred, std_pred = model.predict(X_pred, return_std=True)
+
+    return gsp_pred, std_pred
+
+def add_gsp_plot(fig, dates_full, mean_pred, std_pred):
+    # Add mean prediction
+    fig.add_trace(go.Scatter(
+        x=dates_full,
+        y=mean_pred,
+        mode='lines',
+        name='GSP Mean',
+        line=dict(color='green', dash='dash', width=2),
+        hovertemplate=(
+            "%{y:.2f} ft"
+        )
+    ))
+
+    # Upper bound
+    fig.add_trace(go.Scatter(
+        x=dates_full,
+        y=mean_pred + 1.96 * std_pred,
+        mode="lines",
+        line=dict(width=0),
+        showlegend=False,
+        hoverinfo="skip"
+    ))
+
+    # Lower bound (fills to previous trace)
+    fig.add_trace(go.Scatter(
+        x=dates_full,
+        y=mean_pred - 1.96 * std_pred,
+        mode="lines",
+        fill="tonexty",
+        fillcolor="rgba(0, 0, 255, 0.3)",  # match alpha=0.5-ish
+        line=dict(width=0),
+        name="95% confidence interval",
+        hoverinfo="skip"
     ))

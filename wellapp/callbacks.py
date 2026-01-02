@@ -122,6 +122,13 @@ def register_callbacks(app):
                 showlegend=True
             )
 
+            # Add the Gaussian Process prediction
+            try:
+                mean_pred, std_pred = utils.generate_gsp(station_df, dates_full)
+                utils.add_gsp_plot(fig, dates_full, mean_pred, std_pred)
+            except ValueError:
+                pass
+
             # Create STL plots
             try:
                 fig_trend, fig_seasonal, fig_resid = utils.create_stl_plot(station_df_monthly)
