@@ -666,10 +666,9 @@ def register_callbacks(app):
     # =========================================================================
     @app.callback(
         Output("nearby-stations-plot", "figure"),
-        Input("spatial-click-location", "data"),
-        State("freq-dropdown", "value")
+        Input("spatial-click-location", "data")
     )
-    def update_nearby_stations_plot(click_location, freq):
+    def update_nearby_stations_plot(click_location):
         """
         Plot water level time series from stations near the clicked location.
         
@@ -681,8 +680,6 @@ def register_callbacks(app):
         ----------
         click_location : dict or None
             Clicked location with lat, lon, and elevation
-        freq : str
-            Data frequency ('daily' or 'monthly') from State
         
         Returns
         -------
@@ -716,8 +713,8 @@ def register_callbacks(app):
         clicked_lat = click_location['lat']
         clicked_lon = click_location['lon']
         
-        # Select appropriate dataset based on frequency
-        df = df_monthly if freq == 'monthly' else df_daily
+        # Select monthly only
+        df = df_monthly
         
         # Get unique stations with their coordinates
         stations = stations_df[['STATION', 'LATITUDE', 'LONGITUDE']].drop_duplicates()
