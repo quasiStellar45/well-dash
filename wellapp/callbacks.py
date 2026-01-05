@@ -215,18 +215,19 @@ def register_callbacks(app):
         if not station_df.empty:
             # ---- Plot observed data ----
             fig = utils.plot_station_data(df, station_id, quality_codes)
-        
-            # ---- Generate XGBoost predictions (extends to present) ----
-            predictions_full, dates_full = utils.generate_ml_predictions(
-                station_id, station_df, stations_df, df_monthly, model
-            )
             
-            # ---- Generate predictions for trend plot (only to last data point) ----
-            # We use monthly data for STL decomposition
+            # We use monthly data for computation for speed
             station_df_monthly = df_monthly.loc[
                 df_monthly.STATION == station_id, 
                 ['MSMT_DATE', 'WSE']
             ]
+
+            # ---- Generate XGBoost predictions (extends to present) ----
+            predictions_full, dates_full = utils.generate_ml_predictions(
+                station_id, station_df, stations_df, df_monthly, model
+            )
+
+            # ---- Generate predictions for trend plot (only to last data point) ----
             last_data_date = station_df_monthly['MSMT_DATE'].max()
             date_range_trend = pd.date_range(
                 start=dates_full[0], 
@@ -247,17 +248,10 @@ def register_callbacks(app):
                 line=dict(color='red', dash='dash', width=2),
                 hovertemplate="%{y:.2f} ft"
             ))
-            
-            # Update title to indicate predictions are included
-            current_title = fig.layout.title.text if fig.layout.title else ""
-            fig.update_layout(
-                title=f'{current_title} (with XGBoost and Gaussian Process Predictions)',
-                showlegend=True
-            )
 
             # ---- Add Gaussian Process prediction with uncertainty ----
             try:
-                mean_pred, std_pred = utils.generate_gsp(station_df, dates_full)
+                mean_pred, std_pred = utils.generate_gsp(station_df_monthly, dates_full)
                 utils.add_gsp_plot(fig, dates_full, mean_pred, std_pred)
             except ValueError:
                 # GSP may fail if insufficient data
