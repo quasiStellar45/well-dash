@@ -18,14 +18,19 @@ from sklearn.gaussian_process.kernels import RBF, ExpSineSquared, WhiteKernel
 
 def load_kaggle_data(file_name, data_handle):
     """
-    Loads Kaggle data into a Pandas dataframe.
+    Load Kaggle dataset into a Pandas DataFrame.
 
-    Args:
-    - file_name: file with .csv extenstion
-    - data_handle: handle found on Kaggle site
+    Parameters
+    ----------
+    file_name : str
+        File with .csv extension to load from the dataset
+    data_handle : str
+        Dataset handle found on Kaggle site (format: 'username/dataset-name')
 
-    Returns:
-    - df: Pandas dataframe with data loaded from Kaggle
+    Returns
+    -------
+    pd.DataFrame
+        Pandas dataframe with data loaded from Kaggle
     """
     # Load the latest version
     df = kagglehub.dataset_load(
@@ -37,7 +42,23 @@ def load_kaggle_data(file_name, data_handle):
     return df
 
 def load_data():
-    """Loads the data from Kaggle."""
+    """
+    Load all groundwater level datasets from Kaggle.
+    
+    Loads daily measurements, monthly measurements, quality codes, and station
+    metadata. Automatically converts date columns to datetime format.
+
+    Returns
+    -------
+    df_daily : pd.DataFrame
+        Daily groundwater level measurements with datetime index
+    df_monthly : pd.DataFrame
+        Monthly groundwater level measurements with datetime index
+    quality_codes : pd.DataFrame
+        Quality code descriptions and definitions
+    stations_df : pd.DataFrame
+        Station metadata including location, elevation, and well depth
+    """
     # Load all csvs from the data handle
     data_handle = "alifarahmandfar/continuous-groundwater-level-measurements-2023"
     df_daily = load_kaggle_data('gwl-daily.csv',data_handle)
@@ -52,7 +73,29 @@ def load_data():
     return df_daily, df_monthly, quality_codes, stations_df
 
 def create_map(df: pd.DataFrame):
-    """Function to create the map plot."""
+    """
+    Create an interactive map plot of groundwater monitoring stations.
+    
+    Displays stations on a map with color-coding for selection status
+    (selected, included, or excluded). Hover information includes station
+    details such as elevation, well depth, and coordinates.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing station information with columns:
+        - LATITUDE: station latitude
+        - LONGITUDE: station longitude
+        - STATION: station identifier
+        - ELEV: elevation in feet
+        - WELL_DEPTH: well depth in feet
+        - highlight: station status ('selected', 'included', or 'excluded')
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        Interactive map visualization with station markers and hover information
+    """
 
     # color map for plotting
     color_map = {
@@ -116,7 +159,32 @@ def create_map(df: pd.DataFrame):
     return fig
 
 def plot_station_data(df: pd.DataFrame, station_id: str, quality_codes: pd.DataFrame):
-    """Plots the data for the selected station."""
+    """
+    Create a time series plot of water level data for a specific station.
+    
+    Plots water surface elevation over time with quality control flag information
+    in hover tooltips. Data points are connected with lines and markers.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing water level measurements with columns:
+        - STATION: station identifier
+        - MSMT_DATE: measurement date
+        - WSE: water surface elevation in feet above sea level
+        - WSE_QC: quality control code
+    station_id : str
+        Identifier for the station to plot
+    quality_codes : pd.DataFrame
+        DataFrame mapping quality codes to descriptions with columns:
+        - QUALITY_CODE: code identifier
+        - DESCRIPTION: human-readable description
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        Interactive time series plot with hover information
+    """
     # Locate the data for the station
     df = df.copy().loc[df.STATION == station_id]
 
@@ -162,7 +230,25 @@ def plot_station_data(df: pd.DataFrame, station_id: str, quality_codes: pd.DataF
     return fig
 
 def determine_elevation_from_raster(long: float, lat: float):
-    """Determines the elevation from 3DEP data at a lat and long provided."""
+    """
+    Query ground surface elevation from 3DEP raster data at a coordinate.
+    
+    Uses the USGS 3DEP (3D Elevation Program) dataset to retrieve elevation
+    data at the specified latitude and longitude. Converts elevation from
+    meters to feet.
+
+    Parameters
+    ----------
+    long : float
+        Longitude in decimal degrees (WGS84)
+    lat : float
+        Latitude in decimal degrees (WGS84)
+
+    Returns
+    -------
+    float
+        Ground surface elevation in feet, rounded to 2 decimal places
+    """
     m_to_ft = 3.28
     surface_elevation = py3dep.elevation_bycoords(
         [(long, lat)],
@@ -171,21 +257,60 @@ def determine_elevation_from_raster(long: float, lat: float):
 
     return round(surface_elevation * m_to_ft, 2)
 
-def load_ml_model(model_name = "wl_xgb_model_3.bin"):
-    """Load a XGBoost ml model."""
+def load_ml_model(model_name = "wl_xgb_model_basin.bin"):
+    """
+    Load a trained XGBoost model from disk.
+
+    Parameters
+    ----------
+    model_name : str, optional
+        Path to the saved XGBoost model file, by default "wl_xgb_model_basin.bin"
+
+    Returns
+    -------
+    xgb.XGBRegressor
+        Loaded XGBoost regression model ready for predictions
+    """
     loaded_model = xgb.XGBRegressor()
     loaded_model.load_model(model_name)
     return loaded_model
 
-def load_encoder(encoder_path = "encoder.joblib"):
-    """Loads the encoder for station labels."""
+def load_encoder(encoder_path = "station_encoder.joblib"):
+    """
+    Load a fitted LabelEncoder from disk.
+
+    Parameters
+    ----------
+    encoder_path : str, optional
+        Path to the saved encoder file, by default "station_encoder.joblib"
+
+    Returns
+    -------
+    sklearn.preprocessing.LabelEncoder
+        Fitted label encoder for transforming categorical labels
+    """
     le = joblib.load(encoder_path)
     return le
 
 def encode_station(station_id, encoder):
     """
-    Encode a station ID using the fitted LabelEncoder.
-    Returns 0 if station is not in the encoder's classes.
+    Encode a station ID using a fitted LabelEncoder.
+    
+    If the station ID is not found in the encoder's classes (i.e., not seen
+    during training), returns the encoding of the first class as a fallback.
+
+    Parameters
+    ----------
+    station_id : str
+        Station identifier to encode
+    encoder : sklearn.preprocessing.LabelEncoder
+        Fitted label encoder containing known station IDs
+
+    Returns
+    -------
+    int
+        Encoded station ID as an integer. Returns encoding of first class
+        if station_id is unknown to the encoder.
     """
     try:
         return encoder.transform([station_id])[0]
@@ -195,9 +320,27 @@ def encode_station(station_id, encoder):
     
 def create_stl_plot(station_df):
     """
-    Creates a plot of seasonal variation for the data and ml model
+    Perform Seasonal-Trend decomposition using LOESS (STL) and create plots.
     
-    :param station_df: df for the station
+    First applies an Unobserved Components model to smooth the water level data,
+    then performs STL decomposition to separate trend, seasonal, and residual
+    components. Creates three separate plots for visualization.
+
+    Parameters
+    ----------
+    station_df : pd.DataFrame
+        DataFrame containing water level measurements with columns:
+        - MSMT_DATE: measurement date
+        - WSE: water surface elevation in feet
+
+    Returns
+    -------
+    fig_trend : plotly.graph_objects.Figure
+        Plot showing observed data, unobserved estimation, and trend component
+    fig_seasonal : plotly.graph_objects.Figure
+        Plot showing the seasonal variation component
+    fig_resid : plotly.graph_objects.Figure
+        Plot showing the residual component after removing trend and seasonality
     """
     # Ensure station_df has a DatetimeIndex
     df_test = station_df.copy().sort_values('MSMT_DATE')
@@ -230,14 +373,14 @@ def create_stl_plot(station_df):
         y=filled,
         mode='lines',
         name='Unobserved Estimation',
-        line=dict(color='green')
+        line=dict(color='cyan')
     ))
     fig_trend.add_trace(go.Scatter(
         x=filled.index,
         y=res_stl.trend,
         mode='lines',
         name='Unobserved Trend',
-        line=dict(color='green', dash='dash')
+        line=dict(color='cyan', dash='dash')
     ))
     fig_trend.update_layout(
         title='Trend Component',
@@ -254,7 +397,7 @@ def create_stl_plot(station_df):
         y=res_stl.seasonal,
         mode='lines',
         name='Seasonal',
-        line=dict(color='magenta'),
+        line=dict(color='cyan'),
         hovertemplate=(
             "%{y:.2f}"
         )
@@ -274,7 +417,7 @@ def create_stl_plot(station_df):
         y=res_stl.resid,
         mode='lines',
         name='Residual',
-        line=dict(color='brown'),
+        line=dict(color='cyan'),
         hovertemplate=(
             "%{y:.2f}"
         )
@@ -291,11 +434,24 @@ def create_stl_plot(station_df):
 
 def create_empty_fig(title, yaxis_title, xaxis_title="Date"):
     """
-    Creates and empty figure.
+    Create an empty Plotly figure with formatted axes and title.
     
-    :param title: Figure title
-    :param yaxis_title: Title of y-axis
-    :param xaxis_title: Title of x-axis
+    Useful for initializing plots before data is available or for
+    placeholder visualizations.
+
+    Parameters
+    ----------
+    title : str
+        Figure title
+    yaxis_title : str
+        Label for the y-axis
+    xaxis_title : str, optional
+        Label for the x-axis, by default "Date"
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        Empty figure with specified formatting
     """
     fig = go.Figure()
     fig.update_layout(
@@ -310,7 +466,47 @@ def create_empty_fig(title, yaxis_title, xaxis_title="Date"):
 
 def generate_ml_predictions(station_id=None, station_df=None, stations_df=None, monthly_df=None, model=None, 
                             click_data=None, well_depth=None):
-    """Generate ML predictions for a station."""
+    """
+    Generate machine learning predictions for groundwater levels.
+    
+    Can generate predictions either for an existing station (using station_id)
+    or for an arbitrary location (using click_data from map). Creates feature
+    matrix including temporal, spatial, and station metadata features.
+
+    Parameters
+    ----------
+    station_id : str, optional
+        Station identifier for known monitoring locations, by default None
+    station_df : pd.DataFrame, optional
+        DataFrame containing station water level history, by default None
+    stations_df : pd.DataFrame, optional
+        DataFrame containing all station metadata, by default None
+    monthly_df : pd.DataFrame, optional
+        DataFrame containing monthly measurements for reference date, by default None
+    model : xgb.XGBRegressor, optional
+        Trained XGBoost model for predictions, by default None
+    click_data : dict, optional
+        Dictionary containing 'lat', 'lon', and optionally 'elevation' for
+        arbitrary locations, by default None
+    well_depth : float, optional
+        Well depth in feet (used for click_data locations), by default None
+
+    Returns
+    -------
+    predictions : np.ndarray
+        Predicted water surface elevations in feet
+    dates : pd.DatetimeIndex
+        Dates corresponding to each prediction
+
+    Notes
+    -----
+    Features used in prediction include:
+    - Station and basin encodings
+    - Temporal features (day, month, year, days since reference)
+    - Cyclical time features (sin/cos of day of year and month)
+    - Spatial features (elevation, latitude, longitude, well depth)
+    """
+    le_basin = load_encoder("basin_encoder.joblib")
     if click_data:
         # Load data from map click
         lat = click_data["lat"]
@@ -321,6 +517,10 @@ def generate_ml_predictions(station_id=None, station_df=None, stations_df=None, 
         start_date = pd.Timestamp("2000-01-01")
         
         station_encoded = 0  # or use mean encoding for unknown stations
+
+        # Determine nearest station
+        basin_name = nearest_station_basin(click_data, stations_df)
+        basin_encoded = encode_station(basin_name, le_basin)
     else:
         # Load label encoder for station names
         le = load_encoder()
@@ -333,6 +533,8 @@ def generate_ml_predictions(station_id=None, station_df=None, stations_df=None, 
         well_depth = station_info['WELL_DEPTH']
         station_encoded = encode_station(station_id, le)
         start_date = station_df['MSMT_DATE'].min()
+        basin_name = station_info['BASIN_NAME']
+        basin_encoded = encode_station(basin_name, le_basin)
     
     # Create date range
     end_date = pd.Timestamp.now()
@@ -356,6 +558,7 @@ def generate_ml_predictions(station_id=None, station_df=None, stations_df=None, 
     # --- Feature matrix ---
     X = np.column_stack([
         np.full(n, station_encoded),
+        np.full(n, basin_encoded),
         day,
         month,
         year,
@@ -376,8 +579,26 @@ def generate_ml_predictions(station_id=None, station_df=None, stations_df=None, 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     """
-    Calculate distance between two points using Haversine formula.
-    Returns distance in miles.
+    Calculate great circle distance between two points using Haversine formula.
+    
+    Computes the shortest distance over the Earth's surface between two
+    geographic coordinates.
+
+    Parameters
+    ----------
+    lat1 : float
+        Latitude of first point in decimal degrees
+    lon1 : float
+        Longitude of first point in decimal degrees
+    lat2 : float
+        Latitude of second point in decimal degrees
+    lon2 : float
+        Longitude of second point in decimal degrees
+
+    Returns
+    -------
+    float
+        Distance between the two points in miles
     """
     # Convert to radians
     lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
@@ -394,6 +615,27 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return c * r / km_to_miles
 
 def add_map_marker(fig, click_data):
+    """
+    Add a red marker to a map figure at a clicked location.
+    
+    Adds a prominent marker with hover information to indicate a selected
+    location on the map.
+
+    Parameters
+    ----------
+    fig : plotly.graph_objects.Figure
+        Existing map figure to add marker to
+    click_data : dict
+        Dictionary containing location information with keys:
+        - 'lat': latitude in decimal degrees
+        - 'lon': longitude in decimal degrees
+        - 'elevation': elevation in feet (optional)
+
+    Returns
+    -------
+    None
+        Modifies the figure in-place
+    """
     fig.add_trace(go.Scattermapbox(
         lat=[click_data["lat"]],
         lon=[click_data["lon"]],
@@ -412,9 +654,34 @@ def add_map_marker(fig, click_data):
 
 def generate_gsp(data : pd.DataFrame, date_range):
     """
-    Generates a gaussian process for the station data
+    Generate Gaussian Process predictions for water level time series.
     
-    :param data: dataframe with waterlevel and date.
+    Fits a Gaussian Process Regressor with seasonal and trend kernels to
+    model water level behavior. Uses a combination of exponential sine
+    squared (for seasonality), RBF (for trends), and white noise kernels.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        DataFrame containing water level measurements with columns:
+        - MSMT_DATE: measurement dates (datetime)
+        - WSE: water surface elevation in feet
+    date_range : pd.DatetimeIndex
+        Dates for which to generate predictions
+
+    Returns
+    -------
+    gsp_pred : np.ndarray
+        Mean predictions of water surface elevation
+    std_pred : np.ndarray
+        Standard deviation (uncertainty) of predictions
+
+    Notes
+    -----
+    The model is trained on all available data and uses three kernel components:
+    - ExpSineSquared: captures annual seasonality (365-day period)
+    - RBF: captures long-term trends
+    - WhiteKernel: accounts for measurement noise
     """
     # Clean data
     data = data.copy()[['MSMT_DATE', 'WSE']].dropna()
@@ -429,11 +696,11 @@ def generate_gsp(data : pd.DataFrame, date_range):
 
     # Create Gaussian Process model
     kernel = (
-        1.0 * ExpSineSquared(periodicity=365.0) +
-        1.0 * RBF(length_scale=1.0) 
-        #WhiteKernel(noise_level=0.01)
+        1.0 * ExpSineSquared(periodicity=365.0, length_scale=30) +
+        1.0 * RBF(length_scale=100) +
+        WhiteKernel(noise_level=0.01)
     )
-    gsp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=9)
+    gsp = GaussianProcessRegressor(kernel=kernel, normalize_y=True)
     model = gsp.fit(x_train, y_train)
 
     # Prediction for the entire dataset
@@ -443,6 +710,33 @@ def generate_gsp(data : pd.DataFrame, date_range):
     return gsp_pred, std_pred
 
 def add_gsp_plot(fig, dates_full, mean_pred, std_pred):
+    """
+    Add Gaussian Process predictions with confidence intervals to a plot.
+    
+    Adds the mean prediction line and a shaded region representing the 95%
+    confidence interval to an existing figure.
+
+    Parameters
+    ----------
+    fig : plotly.graph_objects.Figure
+        Existing figure to add GSP predictions to
+    dates_full : pd.DatetimeIndex or array-like
+        Date values for x-axis
+    mean_pred : np.ndarray
+        Mean predicted water surface elevations
+    std_pred : np.ndarray
+        Standard deviation of predictions for uncertainty bounds
+
+    Returns
+    -------
+    None
+        Modifies the figure in-place
+
+    Notes
+    -----
+    The confidence interval is calculated as mean ± 1.96 * std, representing
+    approximately 95% confidence bounds assuming normality.
+    """
     # Add mean prediction
     fig.add_trace(go.Scatter(
         x=dates_full,
@@ -471,8 +765,62 @@ def add_gsp_plot(fig, dates_full, mean_pred, std_pred):
         y=mean_pred - 1.96 * std_pred,
         mode="lines",
         fill="tonexty",
-        fillcolor="rgba(0, 0, 255, 0.3)",  # match alpha=0.5-ish
+        fillcolor="rgba(235, 216, 190, 0.3)", 
         line=dict(width=0),
         name="95% confidence interval",
         hoverinfo="skip"
     ))
+
+def nearest_station_basin(click_data, df_stations):
+    """
+    Find the nearest monitoring station to a clicked point and return its basin.
+    
+    Uses the Haversine formula to calculate great circle distances from the
+    clicked location to all stations, then identifies the nearest one.
+
+    Parameters
+    ----------
+    click_data : dict
+        Dictionary containing clicked location with keys:
+        - 'lat': latitude in decimal degrees
+        - 'lon': longitude in decimal degrees
+    df_stations : pd.DataFrame
+        DataFrame containing station information with columns:
+        - STATION: station identifier
+        - LATITUDE: station latitude
+        - LONGITUDE: station longitude
+        - BASIN_NAME: name of the basin/watershed
+
+    Returns
+    -------
+    basin_name : str
+        BASIN_NAME of the nearest station
+    station_name : str
+        Name/identifier of the nearest station
+    distance_m : float
+        Distance to the nearest station in meters
+    """
+    # Earth radius in meters
+    R = 6371000  
+
+    # Extract lat and lon
+    lat=click_data["lat"]
+    lon=click_data["lon"]
+
+    # Convert degrees to radians
+    lat_click_rad = np.radians(lat)
+    lon_click_rad = np.radians(lon)
+    lat_stations_rad = np.radians(df_stations['LATITUDE'].values)
+    lon_stations_rad = np.radians(df_stations['LONGITUDE'].values)
+
+    # Haversine formula
+    dlat = lat_stations_rad - lat_click_rad
+    dlon = lon_stations_rad - lon_click_rad
+    a = np.sin(dlat/2)**2 + np.cos(lat_click_rad) * np.cos(lat_stations_rad) * np.sin(dlon/2)**2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+    distances = R * c  # meters
+
+    idx = np.argmin(distances)
+    nearest_station = df_stations.iloc[idx]
+
+    return nearest_station['BASIN_NAME'], nearest_station['STATION'], distances[idx]

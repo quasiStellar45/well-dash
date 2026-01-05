@@ -209,8 +209,10 @@ layout = html.Div(
                                                                     [
                                                                         html.Span("Historical measurements ", style={"color": "#6b7280"}),
                                                                         html.Span("(blue)", style={"color": "#2563eb", "fontWeight": "600"}),
-                                                                        html.Span(" with ML predictions ", style={"color": "#6b7280"}),
-                                                                        html.Span("(red)", style={"color": "#dc2626", "fontWeight": "600"})
+                                                                        html.Span(" with XGB predictions ", style={"color": "#6b7280"}),
+                                                                        html.Span("(red)", style={"color": "#dc2626", "fontWeight": "600"}),
+                                                                        html.Span(" and Gaussian Process predictions ", style={"color": "#6b7280"}),
+                                                                        html.Span("(green)", style={"color": "#109210", "fontWeight": "600"})
                                                                     ],
                                                                     style={
                                                                         "margin": "0 0 20px 0",
@@ -672,8 +674,8 @@ layout = html.Div(
                             [
                                 html.Span("Data source: ", style={"color": "#9ca3af"}),
                                 html.A(
-                                    "California Department of Water Resources",
-                                    href="https://water.ca.gov/",
+                                    "Kaggle (California Department of Water Resources)",
+                                    href="https://www.kaggle.com/datasets/alifarahmandfar/continuous-groundwater-level-measurements-2023",
                                     target="_blank",
                                     style={
                                         "color": "#2563eb",
