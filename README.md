@@ -29,7 +29,7 @@ This repository contains a Dash-based web application that enables users to expl
 
 ### Core Framework
 - **Dash/Plotly**: Interactive web application and visualizations
-- **Python 3.11+**: Backend processing and data analysis
+- **Python 3.12+**: Backend processing and data analysis
 
 ### Machine Learning & Statistics
 - **XGBoost**: Gradient boosting regression for water level prediction
