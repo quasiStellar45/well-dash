@@ -1,5 +1,8 @@
 # well-dash
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
 An interactive web application for visualizing and predicting groundwater levels in Northern California using machine learning and time series analysis.
 
 ## 🌊 Overview
@@ -65,7 +68,7 @@ This repository contains a Dash-based web application that enables users to expl
 - Basin name (label encoded)
 
 ### Model Performance
-- Trained on monthly measurements (2000-2023)
+- Trained on monthly and daily measurements (1970-2022)
 - Cross-validated using time series split
 - Handles missing data and irregular sampling
 
@@ -97,7 +100,7 @@ The app automatically downloads data from Kaggle on first run. Ensure you have:
 
 4. **Run the application:**
 ```bash
-python app.py
+python run.py
 ```
 
 5. **Open your browser:**
@@ -106,17 +109,19 @@ Navigate to `http://localhost:8050`
 ### Project Structure
 ```
 well-dash/
-├── app.py                          # Main application entry point
+├── run.py                          # Main application entry point
 ├── wellapp/
 │   ├── callbacks.py                # Dash callback functions
 │   ├── utils.py                    # Utility functions (data loading, plotting)
-│   ├── config.py                   # Configuration settings (optional)
-│   └── ...
+│   └── layout.py                   # Layout of web page                
 ├── models/
 │   ├── wl_xgb_model_basin.bin     # Trained XGBoost model
 │   ├── station_encoder.joblib     # Station ID encoder
 │   └── basin_encoder.joblib       # Basin name encoder
 ├── requirements.txt                # Python dependencies
+├── LICENSE                         # License file
+├── pyproject.toml                  # Set up file
+├── .gitignore                      # git ignore file  
 └── README.md                       # This file
 ```
 
@@ -151,15 +156,14 @@ well-dash/
 ## 🧪 Model Training
 
 The XGBoost model was trained using:
-- **Dataset**: 50,000+ monthly measurements from 100+ stations
-- **Time period**: 2000-2023
+- **Dataset**: 100,000+ monthly and daily measurements from 100+ stations
+- **Time period**: 1970-2023
 - **Features**: 14 input features (temporal + spatial + categorical)
 - **Target**: Water Surface Elevation (WSE) in feet above sea level
 - **Validation**: Time series cross-validation with forward chaining
 
-### To Retrain the Model:
+### To Train a Model:
 ```python
-# See notebooks/model_training.ipynb for full training pipeline
 # Key steps:
 # 1. Load and preprocess data
 # 2. Engineer features (temporal, spatial, cyclical)
@@ -192,7 +196,6 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions for vari
 
 - **Groundwater Level Data**: [Kaggle - Continuous Groundwater Level Measurements (2023)](https://www.kaggle.com/datasets/alifarahmandfar/continuous-groundwater-level-measurements-2023)
 - **Elevation Data**: USGS 3D Elevation Program (3DEP) via `py3dep` package
-- **Basin Boundaries**: California Department of Water Resources groundwater basin definitions
 
 ## 🤝 Contributing
 
@@ -204,15 +207,11 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## 🙏 Acknowledgments
 
 - **Data Provider**: Ali Farahmandfar for the Kaggle groundwater dataset
 - **USGS**: For 3DEP elevation data access
-- **California DWR**: For groundwater basin definitions
+- **California DWR**: For groundwater data
 - **Plotly/Dash**: For the excellent visualization framework
 
 ## 📧 Contact
@@ -230,6 +229,17 @@ Project Link: [https://github.com/yourusername/well-dash](https://github.com/you
 - [ ] Historical drought impact analysis
 - [ ] Real-time data integration from USGS/DWR APIs
 
+## ⚠️ Disclaimer
+
+This application is for **informational and educational purposes only**. 
+
+- Predictions are based on historical data and statistical models
+- **NOT** a substitute for professional hydrogeological assessment
+- **NOT** suitable for regulatory compliance or permitting decisions
+- Water well drilling should only be done by licensed professionals
+- Consult with qualified experts before making water resource decisions
+
+The authors and contributors are not liable for any decisions made based on this tool.
 ---
 
 ⭐ **Star this repo** if you find it useful!

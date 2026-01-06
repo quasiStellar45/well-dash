@@ -257,7 +257,7 @@ def determine_elevation_from_raster(long: float, lat: float):
 
     return round(surface_elevation * m_to_ft, 2)
 
-def load_ml_model(model_name = "wl_xgb_model_basin.bin"):
+def load_ml_model(model_name = "models/wl_xgb_model_basin.bin"):
     """
     Load a trained XGBoost model from disk.
 
@@ -275,7 +275,7 @@ def load_ml_model(model_name = "wl_xgb_model_basin.bin"):
     loaded_model.load_model(model_name)
     return loaded_model
 
-def load_encoder(encoder_path = "station_encoder.joblib"):
+def load_encoder(encoder_path = "models/station_encoder.joblib"):
     """
     Load a fitted LabelEncoder from disk.
 
@@ -507,7 +507,7 @@ def generate_ml_predictions(station_id=None, station_df=None, stations_df=None, 
     - Cyclical time features (sin/cos of day of year and month)
     - Spatial features (elevation, latitude, longitude, well depth)
     """
-    le_basin = load_encoder("basin_encoder.joblib")
+    le_basin = load_encoder("models/basin_encoder.joblib")
     if click_data:
         # Load data from map click
         lat = click_data["lat"]
