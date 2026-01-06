@@ -11,7 +11,6 @@ from dash import Input, Output, html
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
-from statsmodels.tsa.seasonal import STL
 import wellapp.utils as utils
 
 
