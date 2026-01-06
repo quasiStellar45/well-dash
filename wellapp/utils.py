@@ -373,7 +373,8 @@ def create_stl_plot(station_df):
         y=filled,
         mode='lines',
         name='Unobserved Estimation',
-        line=dict(color='cyan')
+        line=dict(color='cyan'),
+        visible='legendonly'
     ))
     fig_trend.add_trace(go.Scatter(
         x=filled.index,
@@ -824,3 +825,115 @@ def nearest_station_basin(click_data, df_stations):
     nearest_station = df_stations.iloc[idx]
 
     return nearest_station['BASIN_NAME'], nearest_station['STATION'], distances[idx]
+
+def add_to_stl(fig_trend, fig_seasonal, fig_resid, dates_trend, predictions_trend, name='XGB', color='red'):
+    """
+    Perform STL decomposition on predictions and add components to plots.
+    
+    This function takes time series predictions, performs Seasonal-Trend 
+    decomposition using LOESS (STL), and adds the decomposed components 
+    (trend, seasonal, residual) to existing Plotly figures.
+    
+    Parameters
+    ----------
+    fig_trend : plotly.graph_objects.Figure
+        Figure for trend component. Will have both the raw predictions 
+        and extracted trend added as traces.
+    fig_seasonal : plotly.graph_objects.Figure
+        Figure for seasonal component. Will have the seasonal pattern added.
+    fig_resid : plotly.graph_objects.Figure
+        Figure for residual component. Will have the residuals added.
+    dates_trend : pd.DatetimeIndex or array-like
+        Dates corresponding to the predictions
+    predictions_trend : np.ndarray or array-like
+        Time series predictions to decompose
+    name : str, optional
+        Name prefix for traces in legend (e.g., 'XGB', 'GPR'), by default 'XGB'
+    color : str, optional
+        Color for all traces from this decomposition, by default 'red'
+    
+    Returns
+    -------
+    None
+        Modifies the figures in-place by adding traces
+    
+    Notes
+    -----
+    - The raw predictions are added to the trend plot but hidden by default 
+      (visible='legendonly'). Users can click the legend to show them.
+    - STL decomposition uses a period of 12 (monthly seasonality)
+    - The trend component uses a dashed line to distinguish from raw predictions
+    - All figures are modified in-place; no return value needed
+    
+    Examples
+    --------
+    >>> # After creating base STL plots for observed data
+    >>> fig_trend, fig_seasonal, fig_resid = utils.create_stl_plot(station_data)
+    >>> 
+    >>> # Add XGBoost predictions to the plots
+    >>> add_to_stl(
+    ...     fig_trend, fig_seasonal, fig_resid,
+    ...     dates=ml_dates,
+    ...     predictions_trend=ml_predictions,
+    ...     name='XGB',
+    ...     color='red'
+    ... )
+    >>> 
+    >>> # Add Gaussian Process predictions to the same plots
+    >>> add_to_stl(
+    ...     fig_trend, fig_seasonal, fig_resid,
+    ...     dates=gp_dates,
+    ...     predictions_trend=gp_predictions,
+    ...     name='GPR',
+    ...     color='green'
+    ... )
+    
+    See Also
+    --------
+    statsmodels.tsa.seasonal.STL : The STL decomposition implementation
+    utils.create_stl_plot : Creates the base STL plots for observed data
+    """
+    
+    # ---- Perform STL decomposition on ML predictions ----
+    stl_ml = STL(predictions_trend, period=12)
+    res_stl_ml = stl_ml.fit()
+
+    # Add data to trend plot
+    fig_trend.add_trace(go.Scatter(
+        x=dates_trend,
+        y=predictions_trend,
+        mode='lines',
+        name=f'{name} Prediction',
+        line=dict(color=color, width=2),
+        hovertemplate="%{y:.2f}",
+        visible='legendonly'
+    ))
+
+    # Add trend component
+    fig_trend.add_trace(go.Scatter(
+        x=dates_trend,
+        y=res_stl_ml.trend,
+        mode='lines',
+        name=f'{name} Trend',
+        line=dict(color=color, dash='dash')
+    ))
+
+    # Add seasonal component
+    fig_seasonal.add_trace(go.Scatter(
+        x=dates_trend,
+        y=res_stl_ml.seasonal,
+        mode='lines',
+        name=f'{name} Seasonal',
+        line=dict(color=color),
+        hovertemplate="%{y:.2f}"
+    ))
+
+    # Add residual component
+    fig_resid.add_trace(go.Scatter(
+        x=dates_trend,
+        y=res_stl_ml.resid,
+        mode='lines',
+        name=f'{name} Residual',
+        line=dict(color=color),
+        hovertemplate="%{y:.2f}"
+    ))

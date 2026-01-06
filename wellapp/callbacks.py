@@ -283,93 +283,13 @@ def register_callbacks(app):
             dates_trend = dates_full[0:len(date_range_trend)]
             
             # ---- Add XGBoost prediction to trend plot ----
-            fig_trend.add_trace(go.Scatter(
-                x=dates_trend,
-                y=predictions_trend,
-                mode='lines',
-                name='XGB Prediction',
-                line=dict(color='red', width=2),
-                hovertemplate="%{y:.2f}"
-            ))
-
-            # ---- Perform STL decomposition on ML predictions ----
-            stl_ml = STL(predictions_trend, period=12)
-            res_stl_ml = stl_ml.fit()
-
-            # Add ML trend component
-            fig_trend.add_trace(go.Scatter(
-                x=dates_trend,
-                y=res_stl_ml.trend,
-                mode='lines',
-                name='XGB Trend',
-                line=dict(color='red', dash='dash')
-            ))
-
-            # Add ML seasonal component
-            fig_seasonal.add_trace(go.Scatter(
-                x=dates_trend,
-                y=res_stl_ml.seasonal,
-                mode='lines',
-                name='XGB Seasonal',
-                line=dict(color='red'),
-                hovertemplate="%{y:.2f}"
-            ))
-
-            # Add ML residual component
-            fig_resid.add_trace(go.Scatter(
-                x=dates_trend,
-                y=res_stl_ml.resid,
-                mode='lines',
-                name='XGB Residual',
-                line=dict(color='red'),
-                hovertemplate="%{y:.2f}"
-            ))
+            utils.add_to_stl(fig_trend, fig_seasonal, fig_resid, dates_trend, predictions_trend)
 
             # Truncate GSP prediction to data limits
             gsp_trend = mean_pred[0:len(date_range_trend)]
 
             # ---- Add GSP prediction to trend plot ----
-            fig_trend.add_trace(go.Scatter(
-                x=dates_trend,
-                y=gsp_trend,
-                mode='lines',
-                name='GSP Mean',
-                line=dict(color='green', width=2),
-                hovertemplate="%{y:.2f}"
-            ))
-
-            # ---- Perform STL decomposition on GSP predictions ----
-            stl_gsp = STL(gsp_trend, period=12)
-            res_stl_gsp = stl_gsp.fit()
-
-            # Add GSP trend component
-            fig_trend.add_trace(go.Scatter(
-                x=dates_trend,
-                y=res_stl_gsp.trend,
-                mode='lines',
-                name='GSP Trend',
-                line=dict(color='green', dash='dash')
-            ))
-
-            # Add ML seasonal component
-            fig_seasonal.add_trace(go.Scatter(
-                x=dates_trend,
-                y=res_stl_gsp.seasonal,
-                mode='lines',
-                name='GSP Seasonal',
-                line=dict(color='green'),
-                hovertemplate="%{y:.2f}"
-            ))
-
-            # Add ML residual component
-            fig_resid.add_trace(go.Scatter(
-                x=dates_trend,
-                y=res_stl_gsp.resid,
-                mode='lines',
-                name='GSP Residual',
-                line=dict(color='green'),
-                hovertemplate="%{y:.2f}"
-            ))
+            utils.add_to_stl(fig_trend, fig_seasonal, fig_resid, dates_trend, gsp_trend, 'GSP', 'green')
             
             return fig, fig_trend, fig_seasonal, fig_resid
             
