@@ -212,7 +212,8 @@ layout = html.Div(
                                                                         html.Span(" with XGB predictions ", style={"color": "#6b7280"}),
                                                                         html.Span("(red)", style={"color": "#dc2626", "fontWeight": "600"}),
                                                                         html.Span(" and Gaussian Process predictions ", style={"color": "#6b7280"}),
-                                                                        html.Span("(green)", style={"color": "#109210", "fontWeight": "600"})
+                                                                        html.Span("(green).", style={"color": "#109210", "fontWeight": "600"}),
+                                                                        html.Span(" Click on legend entries to toggle plot components on/off.", style={"color": "#6b7280"})
                                                                     ],
                                                                     style={
                                                                         "margin": "0 0 20px 0",
@@ -280,7 +281,7 @@ layout = html.Div(
                                                             style={"display": "flex", "alignItems": "center", "marginBottom": "8px"}
                                                         ),
                                                         html.P(
-                                                            "Seasonal-Trend decomposition showing long-term trends, seasonal patterns, and residual variations",
+                                                            "Seasonal-Trend decomposition showing long-term trends, seasonal patterns, and residual variations. Click on legend entries to toggle plot components on/off.",
                                                             style={
                                                                 "margin": "0 0 25px 0",
                                                                 "fontSize": "14px",

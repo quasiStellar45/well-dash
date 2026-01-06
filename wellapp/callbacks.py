@@ -7,7 +7,7 @@ with the dashboard, including map clicks, station selection, data visualization,
 and spatial predictions.
 """
 
-from dash import Input, Output, State, html
+from dash import Input, Output, html
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
@@ -226,18 +226,6 @@ def register_callbacks(app):
             predictions_full, dates_full = utils.generate_ml_predictions(
                 station_id, station_df, stations_df, df_monthly, model
             )
-
-            # ---- Generate predictions for trend plot (only to last data point) ----
-            last_data_date = station_df_monthly['MSMT_DATE'].max()
-            date_range_trend = pd.date_range(
-                start=dates_full[0], 
-                end=last_data_date, 
-                freq='ME'
-            )
-                
-            # Truncate predictions to match trend date range
-            predictions_trend = predictions_full[0:len(date_range_trend)]
-            dates_trend = dates_full[0:len(date_range_trend)]
             
             # ---- Add XGBoost prediction to main plot ----
             fig.add_trace(go.Scatter(
@@ -282,6 +270,18 @@ def register_callbacks(app):
                 )
                 return fig, fig_trend, fig_seasonal, fig_resid
             
+            # ---- Generate predictions for trend plot (only to last data point) ----
+            last_data_date = station_df_monthly['MSMT_DATE'].max()
+            date_range_trend = pd.date_range(
+                start=dates_full[0], 
+                end=last_data_date, 
+                freq='ME'
+            )
+                
+            # Truncate predictions to match trend date range
+            predictions_trend = predictions_full[0:len(date_range_trend)]
+            dates_trend = dates_full[0:len(date_range_trend)]
+            
             # ---- Add XGBoost prediction to trend plot ----
             fig_trend.add_trace(go.Scatter(
                 x=dates_trend,
@@ -291,10 +291,9 @@ def register_callbacks(app):
                 line=dict(color='red', width=2),
                 hovertemplate="%{y:.2f}"
             ))
-            fig_trend.update_layout(showlegend=True)
 
             # ---- Perform STL decomposition on ML predictions ----
-            stl_ml = STL(predictions_trend, period=13)
+            stl_ml = STL(predictions_trend, period=12)
             res_stl_ml = stl_ml.fit()
 
             # Add ML trend component
@@ -311,8 +310,8 @@ def register_callbacks(app):
                 x=dates_trend,
                 y=res_stl_ml.seasonal,
                 mode='lines',
-                name='ML Seasonal',
-                line=dict(color='red', dash='dash'),
+                name='XGB Seasonal',
+                line=dict(color='red'),
                 hovertemplate="%{y:.2f}"
             ))
 
@@ -322,7 +321,53 @@ def register_callbacks(app):
                 y=res_stl_ml.resid,
                 mode='lines',
                 name='XGB Residual',
-                line=dict(color='red', dash='dash'),
+                line=dict(color='red'),
+                hovertemplate="%{y:.2f}"
+            ))
+
+            # Truncate GSP prediction to data limits
+            gsp_trend = mean_pred[0:len(date_range_trend)]
+
+            # ---- Add GSP prediction to trend plot ----
+            fig_trend.add_trace(go.Scatter(
+                x=dates_trend,
+                y=gsp_trend,
+                mode='lines',
+                name='GSP Mean',
+                line=dict(color='green', width=2),
+                hovertemplate="%{y:.2f}"
+            ))
+
+            # ---- Perform STL decomposition on GSP predictions ----
+            stl_gsp = STL(gsp_trend, period=12)
+            res_stl_gsp = stl_gsp.fit()
+
+            # Add GSP trend component
+            fig_trend.add_trace(go.Scatter(
+                x=dates_trend,
+                y=res_stl_gsp.trend,
+                mode='lines',
+                name='GSP Trend',
+                line=dict(color='green', dash='dash')
+            ))
+
+            # Add ML seasonal component
+            fig_seasonal.add_trace(go.Scatter(
+                x=dates_trend,
+                y=res_stl_gsp.seasonal,
+                mode='lines',
+                name='GSP Seasonal',
+                line=dict(color='green'),
+                hovertemplate="%{y:.2f}"
+            ))
+
+            # Add ML residual component
+            fig_resid.add_trace(go.Scatter(
+                x=dates_trend,
+                y=res_stl_gsp.resid,
+                mode='lines',
+                name='GSP Residual',
+                line=dict(color='green'),
                 hovertemplate="%{y:.2f}"
             ))
             

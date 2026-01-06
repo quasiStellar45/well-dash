@@ -355,8 +355,8 @@ def create_stl_plot(station_df):
     # Get smoothed level as a Series with correct index
     filled = pd.Series(res_ucm.smoothed_state[0], index=y.index)
 
-    # STL decomposition — monthly example: period=13
-    stl = STL(filled, period=13)
+    # STL decomposition — monthly example: period=12
+    stl = STL(filled, period=12)
     res_stl = stl.fit()
 
     # Observed + trend
@@ -379,7 +379,7 @@ def create_stl_plot(station_df):
         x=filled.index,
         y=res_stl.trend,
         mode='lines',
-        name='Unobserved Trend',
+        name='Unobserved Estimation Trend',
         line=dict(color='cyan', dash='dash')
     ))
     fig_trend.update_layout(
@@ -396,7 +396,7 @@ def create_stl_plot(station_df):
         x=filled.index,
         y=res_stl.seasonal,
         mode='lines',
-        name='Seasonal',
+        name='Unobserved Seasonal',
         line=dict(color='cyan'),
         hovertemplate=(
             "%{y:.2f}"
@@ -416,7 +416,7 @@ def create_stl_plot(station_df):
         x=filled.index,
         y=res_stl.resid,
         mode='lines',
-        name='Residual',
+        name='Unobserved Residual',
         line=dict(color='cyan'),
         hovertemplate=(
             "%{y:.2f}"
