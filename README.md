@@ -76,7 +76,7 @@ This repository contains a Dash-based web application that enables users to expl
 
 ### Prerequisites
 ```bash
-python >= 3.11
+python >= 3.12
 pip
 ```
 
