@@ -109,7 +109,7 @@ Navigate to `http://localhost:8050`
 ### Project Structure
 ```
 well-dash/
-├── run.py                          # Main application entry point
+├── app.py                          # Main application entry point
 ├── wellapp/
 │   ├── callbacks.py                # Dash callback functions
 │   ├── utils.py                    # Utility functions (data loading, plotting)
@@ -218,7 +218,7 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 
 Tomas Snyder - tomassnyder45@gmail.com
 
-Project Link: [https://github.com/yourusername/well-dash](https://github.com/yourusername/well-dash)
+Project Link: [https://github.com/quasiStellar45/well-dash](https://github.com/quasiStellar45/well-dash)
 
 ---
 
