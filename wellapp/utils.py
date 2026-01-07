@@ -7,7 +7,7 @@ from kagglehub import KaggleDatasetAdapter
 import plotly.express as px
 import pandas as pd
 import py3dep
-import xgboost as xgb
+from xgboost import XGBRegressor
 import joblib
 import numpy as np
 import plotly.graph_objects as go
@@ -271,7 +271,7 @@ def load_ml_model(model_name = "models/wl_xgb_model_basin.json"):
     xgb.XGBRegressor
         Loaded XGBoost regression model ready for predictions
     """
-    loaded_model = xgb.XGBRegressor()
+    loaded_model = XGBRegressor()
     loaded_model.load_model(model_name)
     return loaded_model
 
