@@ -13,6 +13,12 @@ import pandas as pd
 import numpy as np
 import wellapp.utils as utils
 
+# =========================================================================
+# DATA LOADING (executed once)
+# =========================================================================
+df_daily, df_monthly, quality_codes, stations_df = utils.load_data()
+model = utils.load_ml_model()
+
 
 def register_callbacks(app):
     """
@@ -35,12 +41,6 @@ def register_callbacks(app):
     3. Spatial prediction interface
     4. Nearby stations analysis
     """
-    
-    # =========================================================================
-    # DATA LOADING (executed once when callbacks are registered)
-    # =========================================================================
-    df_daily, df_monthly, quality_codes, stations_df = utils.load_data()
-    model = utils.load_ml_model()
 
     # =========================================================================
     # CALLBACK 1: Update main station map
