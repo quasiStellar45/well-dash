@@ -257,7 +257,7 @@ def determine_elevation_from_raster(long: float, lat: float):
 
     return round(surface_elevation * m_to_ft, 2)
 
-def load_ml_model(model_name = "models/wl_xgb_model_basin.bin"):
+def load_ml_model(model_name = "models/wl_xgb_model_basin.json"):
     """
     Load a trained XGBoost model from disk.
 
