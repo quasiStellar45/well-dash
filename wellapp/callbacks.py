@@ -12,12 +12,31 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 import wellapp.utils as utils
+import pickle
+import os
 
 # =========================================================================
 # DATA LOADING (executed once)
 # =========================================================================
 df_daily, df_monthly, quality_codes, stations_df = utils.load_data()
 model = utils.load_ml_model()
+
+# Load pre-computed predictions at startup
+PREDICTIONS_CACHE = {}
+cache_path = 'models/predictions_cache.pkl'
+
+if os.path.exists(cache_path):
+    try:
+        print("Loading pre-computed predictions cache...")
+        with open(cache_path, 'rb') as f:
+            PREDICTIONS_CACHE = pickle.load(f)
+        print(f"Cache loaded with {len(PREDICTIONS_CACHE)} stations")
+    except Exception as e:
+        print(f"Failed to load cache: {e}")
+        print("Will compute predictions on-the-fly")
+else:
+    print("No predictions cache found at", cache_path)
+    print("Will compute predictions on-the-fly (slower)")
 
 
 def register_callbacks(app):
@@ -151,6 +170,9 @@ def register_callbacks(app):
         """
         Update water level plots with observed data, ML predictions, and STL decomposition.
         
+        Uses pre-computed predictions cache for fast response. Falls back to computing
+        on-the-fly if station not in cache.
+        
         This callback generates four plots:
         1. Main water level plot with observed data, XGBoost predictions, and Gaussian Process
         2. Trend component from STL decomposition
@@ -177,12 +199,14 @@ def register_callbacks(app):
         
         Notes
         -----
+        - Uses pre-computed predictions when available (fast ⚡)
+        - Falls back to on-the-fly computation for uncached stations
         - XGBoost predictions extend to the current date
         - Gaussian Process predictions include uncertainty bounds
         - STL decomposition uses monthly data only
         - Returns empty plots if no station is selected or data is unavailable
         """
-        # Return empty plots if no station is selected
+        # ---- EARLY RETURN: No station selected ----
         if not station_id:
             fig = utils.create_empty_fig(
                 "Select a station to plot waterlevel...", 
@@ -201,7 +225,8 @@ def register_callbacks(app):
                 "Residual (ft)"
             )
             return fig, fig_trend, fig_seasonal, fig_resid
-                
+        
+        # ---- GET STATION DATA ----
         # Select appropriate dataframe based on frequency
         if freq == "daily":
             df = df_daily
@@ -211,89 +236,16 @@ def register_callbacks(app):
         # Get data for selected station
         station_df = df.loc[df.STATION == station_id]
         
-        if not station_df.empty:
-            # ---- Plot observed data ----
-            fig = utils.plot_station_data(df, station_id, quality_codes)
-            
-            # We use monthly data for computation for speed
-            station_df_monthly = df_monthly.loc[
-                df_monthly.STATION == station_id, 
-                ['MSMT_DATE', 'WSE']
-            ]
+        # Get monthly data for predictions/STL (regardless of display frequency)
+        station_df_monthly = df_monthly.loc[
+            df_monthly.STATION == station_id, 
+            ['MSMT_DATE', 'WSE']
+        ]
+        
 
-            # ---- Generate XGBoost predictions (extends to present) ----
-            predictions_full, dates_full = utils.generate_ml_predictions(
-                station_id, station_df, stations_df, df_monthly, model
-            )
-            
-            # ---- Add XGBoost prediction to main plot ----
-            fig.add_trace(go.Scatter(
-                x=dates_full,
-                y=predictions_full,
-                mode='lines',
-                name='XGB Prediction',
-                line=dict(color='red', dash='dash', width=2),
-                hovertemplate="%{y:.2f} ft"
-            ))
+        # ---- EARLY RETURN: Station has no data ----
 
-            # ---- Add Gaussian Process prediction with uncertainty ----
-            try:
-                mean_pred, std_pred = utils.generate_gsp(station_df_monthly, dates_full)
-                utils.add_gsp_plot(fig, dates_full, mean_pred, std_pred)
-            except ValueError:
-                # GSP may fail if insufficient data
-                pass
-
-            # ---- Create STL decomposition plots ----
-            try:
-                fig_trend, fig_seasonal, fig_resid = utils.create_stl_plot(
-                    station_df_monthly
-                )
-            except ValueError:
-                # Return empty plots if STL decomposition fails
-                fig = utils.create_empty_fig(
-                    f"No data for {station_id} for this data frequency.", 
-                    "Water Surface Elevation (ft asl)"
-                )
-                fig_trend = utils.create_empty_fig(
-                    "Trend Component", 
-                    "Water Surface Elevation (ft asl)"
-                )
-                fig_seasonal = utils.create_empty_fig(
-                    "Seasonal Component", 
-                    "Seasonal Variation (ft)"
-                )
-                fig_resid = utils.create_empty_fig(
-                    "Residual Component", 
-                    "Residual (ft)"
-                )
-                return fig, fig_trend, fig_seasonal, fig_resid
-            
-            # ---- Generate predictions for trend plot (only to last data point) ----
-            last_data_date = station_df_monthly['MSMT_DATE'].max()
-            date_range_trend = pd.date_range(
-                start=dates_full[0], 
-                end=last_data_date, 
-                freq='ME'
-            )
-                
-            # Truncate predictions to match trend date range
-            predictions_trend = predictions_full[0:len(date_range_trend)]
-            dates_trend = dates_full[0:len(date_range_trend)]
-            
-            # ---- Add XGBoost prediction to trend plot ----
-            utils.add_to_stl(fig_trend, fig_seasonal, fig_resid, dates_trend, predictions_trend)
-
-            # Truncate GSP prediction to data limits
-            gsp_trend = mean_pred[0:len(date_range_trend)]
-
-            # ---- Add GSP prediction to trend plot ----
-            utils.add_to_stl(fig_trend, fig_seasonal, fig_resid, dates_trend, gsp_trend, 'GSP', 'green')
-            
-            return fig, fig_trend, fig_seasonal, fig_resid
-            
-        # Handle case where station has no data
-        else:
+        if station_df.empty:
             fig = utils.create_empty_fig(
                 f"No data for {station_id} for this data frequency.", 
                 "Water Surface Elevation (ft asl)"
@@ -311,6 +263,195 @@ def register_callbacks(app):
                 "Residual (ft)"
             )
             return fig, fig_trend, fig_seasonal, fig_resid
+        
+
+        # ---- GET PREDICTIONS (from cache or compute) ----
+        use_cache = station_id in PREDICTIONS_CACHE
+        
+        if use_cache:
+            # ---- USE PRE-COMPUTED PREDICTIONS (FAST) ----
+            print(f"Using cached predictions for {station_id}")
+            cache = PREDICTIONS_CACHE[station_id]
+            
+            # Extract cached data
+            predictions_full = cache['xgb_predictions']
+            dates_full = cache['xgb_dates']
+            gsp_mean = cache.get('gsp_mean')  # May be None if GP failed
+            gsp_std = cache.get('gsp_std')
+            
+            # STL components (only up to last data point)
+            stl_dates = cache.get('stl_dates')
+            predictions_trend = cache.get('xgb_predictions_trend')  # Truncated version
+            xgb_stl_trend = cache.get('xgb_trend')
+            xgb_stl_seasonal = cache.get('xgb_seasonal')
+            xgb_stl_resid = cache.get('xgb_resid')
+            gsp_stl_trend = cache.get('gsp_trend')
+            gsp_stl_seasonal = cache.get('gsp_seasonal')
+            gsp_stl_resid = cache.get('gsp_resid')
+            gsp_trend_data = cache.get('gsp_predictions_trend')  # Truncated GP predictions
+            
+        else:
+            # ---- COMPUTE (SLOWER) ----
+            print(f"Computing predictions for {station_id} (not in cache)")
+            
+            # Generate XGBoost predictions (extends to present)
+            predictions_full, dates_full = utils.generate_ml_predictions(
+                station_id, station_df, stations_df, df_monthly, model
+            )
+            
+            # Generate Gaussian Process predictions with uncertainty
+            try:
+                gsp_mean, gsp_std = utils.generate_gsp(station_df_monthly, dates_full)
+            except (ValueError, Exception) as e:
+                print(f"GP prediction failed for {station_id}: {e}")
+                gsp_mean = None
+                gsp_std = None
+            
+            # Prepare data for STL (only up to last data point)
+            last_data_date = station_df_monthly['MSMT_DATE'].max()
+            stl_dates = pd.date_range(
+                start=dates_full[0], 
+                end=last_data_date, 
+                freq='ME'
+            )
+            
+            # Truncate predictions to match STL date range
+            predictions_trend = predictions_full[:len(stl_dates)]
+            gsp_trend_data = gsp_mean[:len(stl_dates)] if gsp_mean is not None else None
+            
+            # Compute STL decomposition on predictions
+            try:
+                from statsmodels.tsa.seasonal import STL
+                
+                # STL on XGBoost predictions
+                stl_xgb = STL(predictions_trend, period=12).fit()
+                xgb_stl_trend = stl_xgb.trend
+                xgb_stl_seasonal = stl_xgb.seasonal
+                xgb_stl_resid = stl_xgb.resid
+                
+                # STL on Gaussian Process predictions
+                if gsp_trend_data is not None and len(gsp_trend_data) >= 24:
+                    stl_gsp = STL(gsp_trend_data, period=12).fit()
+                    gsp_stl_trend = stl_gsp.trend
+                    gsp_stl_seasonal = stl_gsp.seasonal
+                    gsp_stl_resid = stl_gsp.resid
+                else:
+                    gsp_stl_trend = None
+                    gsp_stl_seasonal = None
+                    gsp_stl_resid = None
+                    
+            except (ValueError, Exception) as e:
+                print(f"STL decomposition failed for {station_id}: {e}")
+                xgb_stl_trend = None
+                xgb_stl_seasonal = None
+                xgb_stl_resid = None
+                gsp_stl_trend = None
+                gsp_stl_seasonal = None
+                gsp_stl_resid = None
+        
+
+        # ---- BUILD MAIN WATER LEVEL PLOT ----
+
+        # Plot observed data (blue line with markers)
+        fig = utils.plot_station_data(df, station_id, quality_codes)
+        
+        # Add XGBoost prediction (red dashed line)
+        fig.add_trace(go.Scatter(
+            x=dates_full,
+            y=predictions_full,
+            mode='lines',
+            name='XGB Prediction',
+            line=dict(color='red', dash='dash', width=2),
+            hovertemplate="%{y:.2f} ft<extra></extra>"
+        ))
+        
+        # Add Gaussian Process prediction with uncertainty (green with shaded area)
+        if gsp_mean is not None and gsp_std is not None:
+            try:
+                utils.add_gsp_plot(fig, dates_full, gsp_mean, gsp_std)
+            except Exception as e:
+                print(f"Failed to add GP to plot: {e}")
+        
+        # ---- BUILD STL DECOMPOSITION PLOTS ----
+        try:
+            # Create base STL plots from observed data
+            fig_trend, fig_seasonal, fig_resid = utils.create_stl_plot(
+                station_df_monthly
+            )
+            
+            if use_cache:
+                # Fast path: use cached STL components
+                if xgb_stl_trend is not None:
+                    # Add XGBoost STL components (if available)
+                    xgb_components = {
+                        'trend': xgb_stl_trend,
+                        'seasonal': xgb_stl_seasonal,
+                        'resid': xgb_stl_resid
+                    }
+                    utils.add_to_stl(
+                        fig_trend, fig_seasonal, fig_resid,
+                        stl_dates, predictions_trend,
+                        stl_components=xgb_components,
+                        name='XGB',
+                        color='red'
+                    )
+                
+                if gsp_stl_trend is not None:
+                    # Add GSP STL components (if available)
+                    gsp_components = {
+                        'trend': gsp_stl_trend,
+                        'seasonal': gsp_stl_seasonal,
+                        'resid': gsp_stl_resid
+                    }
+                    utils.add_to_stl(
+                        fig_trend, fig_seasonal, fig_resid,
+                        stl_dates, gsp_trend_data,
+                        stl_components=gsp_components,
+                        name='GSP',
+                        color='green'
+                    )
+            else:
+                # Slow path: compute STL 
+                utils.add_to_stl(
+                    fig_trend, fig_seasonal, fig_resid,
+                    stl_dates, predictions_trend,
+                    stl_components=None,
+                    compute_stl=True,
+                    name='XGB',
+                    color='red'
+                )
+                
+                if gsp_mean is not None:
+                    # Compute GSP STL
+                    utils.add_to_stl(
+                        fig_trend, fig_seasonal, fig_resid,
+                        stl_dates, gsp_trend_data,
+                        stl_components=None,
+                        compute_stl=True,
+                        name='GSP',
+                        color='green'
+                    )
+            
+            # Update legend visibility for trend plot
+            fig_trend.update_layout(showlegend=True)
+            
+        except (ValueError, Exception) as e:
+            # STL decomposition failed - return empty plots
+            print(f"Failed to create STL plots for {station_id}: {e}")
+            fig_trend = utils.create_empty_fig(
+                "Insufficient data for STL decomposition", 
+                "Water Surface Elevation (ft asl)"
+            )
+            fig_seasonal = utils.create_empty_fig(
+                "Insufficient data for STL decomposition", 
+                "Seasonal Variation (ft)"
+            )
+            fig_resid = utils.create_empty_fig(
+                "Insufficient data for STL decomposition", 
+                "Residual (ft)"
+            )
+
+        return fig, fig_trend, fig_seasonal, fig_resid
     
     # =========================================================================
     # CALLBACK 4: Update spatial prediction map
