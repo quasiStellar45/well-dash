@@ -674,6 +674,7 @@ layout = html.Div(
                         html.P(
                             [
                                 html.Span("Data source: ", style={"color": "#9ca3af"}),
+
                                 html.A(
                                     "Kaggle (California Department of Water Resources)",
                                     href="https://www.kaggle.com/datasets/alifarahmandfar/continuous-groundwater-level-measurements-2023",
@@ -683,7 +684,20 @@ layout = html.Div(
                                         "textDecoration": "none",
                                         "fontWeight": "500"
                                     }
-                                )
+                                ),
+
+                                html.Span(" • ", style={"color": "#9ca3af", "margin": "0 6px"}),
+
+                                html.A(
+                                    "View on GitHub",
+                                    href="https://github.com/quasiStellar45/well-dash/tree/main",
+                                    target="_blank",
+                                    style={
+                                        "color": "#2563eb",
+                                        "textDecoration": "none",
+                                        "fontWeight": "500"
+                                    }
+                                ),
                             ],
                             style={
                                 "textAlign": "center",
