@@ -362,7 +362,7 @@ def register_callbacks(app):
             mode='lines',
             name='XGB Prediction',
             line=dict(color='red', dash='dash', width=2),
-            hovertemplate="%{y:.2f} ft<extra></extra>"
+            hovertemplate="%{y:.2f} ft"
         ))
         
         # Add Gaussian Process prediction with uncertainty (green with shaded area)
@@ -742,7 +742,10 @@ def register_callbacks(app):
             y=predictions,
             mode='lines',
             name='XGB Prediction',
-            line=dict(color='#dc2626', width=2)
+            line=dict(color='#dc2626', width=2),
+            hovertemplate=(
+                "%{y:.2f} ft<extra></extra>"
+            )
         ))
         
         fig.update_layout(

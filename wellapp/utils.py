@@ -374,7 +374,10 @@ def create_stl_plot(station_df):
         y=y,
         mode='lines+markers',
         name='Observed',
-        line=dict(color='blue')
+        line=dict(color='blue'),
+        hovertemplate=(
+            "%{y:.2f} ft"
+        )
     ))
     fig_trend.add_trace(go.Scatter(
         x=filled.index,
@@ -382,14 +385,20 @@ def create_stl_plot(station_df):
         mode='lines',
         name='Unobserved Estimation',
         line=dict(color='cyan'),
-        visible='legendonly'
+        visible='legendonly',
+        hovertemplate=(
+            "%{y:.2f} ft"
+        )
     ))
     fig_trend.add_trace(go.Scatter(
         x=filled.index,
         y=res_stl.trend,
         mode='lines',
         name='Unobserved Estimation Trend',
-        line=dict(color='cyan', dash='dash')
+        line=dict(color='cyan', dash='dash'),
+        hovertemplate=(
+            "%{y:.2f} ft"
+        )
     ))
     fig_trend.update_layout(
         title='Trend Component',
@@ -408,7 +417,7 @@ def create_stl_plot(station_df):
         name='Unobserved Seasonal',
         line=dict(color='cyan'),
         hovertemplate=(
-            "%{y:.2f}"
+            "%{y:.2f} ft"
         )
     ))
     fig_seasonal.update_layout(
@@ -428,7 +437,7 @@ def create_stl_plot(station_df):
         name='Unobserved Residual',
         line=dict(color='cyan'),
         hovertemplate=(
-            "%{y:.2f}"
+            "%{y:.2f} ft"
         )
     ))
     fig_resid.update_layout(
@@ -937,7 +946,7 @@ def add_to_stl(fig_trend, fig_seasonal, fig_resid, dates_trend, predictions_tren
         mode='lines',
         name=f'{name} Prediction',
         line=dict(color=color, width=2),
-        hovertemplate="%{y:.2f}<extra></extra>",
+        hovertemplate="%{y:.2f} ft",
         visible='legendonly'  # Hidden by default, clickable in legend
     ))
     
@@ -988,7 +997,7 @@ def add_to_stl(fig_trend, fig_seasonal, fig_resid, dates_trend, predictions_tren
         mode='lines',
         name=f'{name} Trend',
         line=dict(color=color, dash='dash'),
-        hovertemplate="%{y:.2f}<extra></extra>"
+        hovertemplate="%{y:.2f} ft"
     ))
     
     # Add seasonal component
@@ -998,7 +1007,7 @@ def add_to_stl(fig_trend, fig_seasonal, fig_resid, dates_trend, predictions_tren
         mode='lines',
         name=f'{name} Seasonal',
         line=dict(color=color, dash='dash'),
-        hovertemplate="%{y:.2f}<extra></extra>"
+        hovertemplate="%{y:.2f} ft"
     ))
     
     # Add residual component
@@ -1008,5 +1017,5 @@ def add_to_stl(fig_trend, fig_seasonal, fig_resid, dates_trend, predictions_tren
         mode='lines',
         name=f'{name} Residual',
         line=dict(color=color, dash='dash'),
-        hovertemplate="%{y:.2f}<extra></extra>"
+        hovertemplate="%{y:.2f} ft"
     ))
