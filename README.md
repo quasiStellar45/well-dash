@@ -5,9 +5,9 @@
 
 An interactive web application for visualizing and predicting groundwater levels in Northern California using machine learning and time series analysis.
 
-[Well Dash App](https://38afdf4f-b1d0-4a37-b350-2902a21bd553.plotly.app/)
+Check out the live deployment of the [Well Dash App](https://38afdf4f-b1d0-4a37-b350-2902a21bd553.plotly.app/)!
 
-## 🌊 Overview
+## Overview
 
 This repository contains a Dash-based web application that enables users to explore continuous groundwater level measurements from monitoring stations across Northern California. The app combines historical data visualization with machine learning predictions to estimate water levels at both monitored and unmonitored locations.
 
@@ -20,14 +20,14 @@ This repository contains a Dash-based web application that enables users to expl
 - **🌍 Spatial Interpolation**: Predict groundwater levels at any location by clicking on the map - the model uses nearest basin information and 3DEP elevation data
 - **🔍 Nearby Station Analysis**: Compare predictions with actual measurements from nearby monitoring stations
 
-## 🎯 Use Cases
+## Use Cases
 
 - **Water Resource Planning**: Forecast seasonal water availability for agricultural and municipal planning
 - **Research & Analysis**: Study long-term groundwater trends and seasonal patterns
 - **Site Assessment**: Estimate water table depth at proposed well locations before drilling
 - **Environmental Monitoring**: Track groundwater response to precipitation and climate patterns
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### Core Framework
 - **Dash/Plotly**: Interactive web application and visualizations
@@ -50,7 +50,7 @@ This repository contains a Dash-based web application that enables users to expl
   - Monthly measurements from 100+ stations
   - Station metadata (coordinates, elevation, well depth, basin)
 
-## 📊 Model Details
+## Model Details
 
 ### Features Used for Prediction
 
@@ -74,7 +74,7 @@ This repository contains a Dash-based web application that enables users to expl
 - Cross-validated using time series split
 - Handles missing data and irregular sampling
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 ```bash
@@ -134,7 +134,7 @@ well-dash/
 └── README.md                       # This file
 ```
 
-## 📖 Usage Guide
+## Usage Guide
 
 ### 1. Station Analysis Tab
 
@@ -162,7 +162,7 @@ well-dash/
 4. View predicted water level time series (2000-present)
 5. Compare with nearby station measurements
 
-## 🧪 Model Training
+## Model Training
 
 The XGBoost model was trained using:
 - **Dataset**: 100,000+ monthly and daily measurements from 100+ stations
@@ -181,32 +181,12 @@ The XGBoost model was trained using:
 # 5. Save model and encoders
 ```
 
-## 🌐 Deployment
-
-### Deploy to Plotly Cloud (Free)
-
-1. **Create `Procfile`:**
-```
-web: gunicorn app:server
-```
-
-2. **Ensure `requirements.txt` includes:**
-```
-gunicorn==23.0.0
-```
-
-3. **Push to GitHub and connect to Render**
-
-4. **Set start command:** `gunicorn app:server`
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions for various platforms.
-
-## 📊 Data Sources
+## Data Sources
 
 - **Groundwater Level Data**: [Kaggle - Continuous Groundwater Level Measurements (2023)](https://www.kaggle.com/datasets/alifarahmandfar/continuous-groundwater-level-measurements-2023)
 - **Elevation Data**: USGS 3D Elevation Program (3DEP) via `py3dep` package
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes:
 
@@ -216,14 +196,14 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **Data Provider**: Ali Farahmandfar for the Kaggle groundwater dataset
 - **USGS**: For 3DEP elevation data access
 - **California DWR**: For groundwater data
 - **Plotly/Dash**: For the excellent visualization framework
 
-## 📧 Contact
+## Contact
 
 Tomas Snyder - tomassnyder45@gmail.com
 
@@ -231,14 +211,14 @@ Project Link: [https://github.com/quasiStellar45/well-dash](https://github.com/q
 
 ---
 
-## 🔮 Future Enhancements
+## Future Enhancements
 
 - [ ] Add precipitation data integration
 - [ ] Implement ensemble models
 - [ ] Historical drought impact analysis
 - [ ] Real-time data integration from USGS/DWR APIs
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 This application is for **informational and educational purposes only**. 
 
