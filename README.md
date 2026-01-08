@@ -5,7 +5,7 @@
 
 An interactive web application for visualizing and predicting groundwater levels in Northern California using machine learning and time series analysis.
 
-[Well Dash App](https://38afdf4f-b1d0-4a37-b350-2902a21bd553.plotly.app/)
+Check out the live deployment of the [Well Dash App](https://38afdf4f-b1d0-4a37-b350-2902a21bd553.plotly.app/)!
 
 ## 🌊 Overview
 
@@ -180,26 +180,6 @@ The XGBoost model was trained using:
 # 4. Validate on held-out time periods
 # 5. Save model and encoders
 ```
-
-## 🌐 Deployment
-
-### Deploy to Plotly Cloud (Free)
-
-1. **Create `Procfile`:**
-```
-web: gunicorn app:server
-```
-
-2. **Ensure `requirements.txt` includes:**
-```
-gunicorn==23.0.0
-```
-
-3. **Push to GitHub and connect to Render**
-
-4. **Set start command:** `gunicorn app:server`
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions for various platforms.
 
 ## 📊 Data Sources
 
