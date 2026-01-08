@@ -5,6 +5,8 @@
 
 An interactive web application for visualizing and predicting groundwater levels in Northern California using machine learning and time series analysis.
 
+[Well Dash App](https://38afdf4f-b1d0-4a37-b350-2902a21bd553.plotly.app/)
+
 ## 🌊 Overview
 
 This repository contains a Dash-based web application that enables users to explore continuous groundwater level measurements from monitoring stations across Northern California. The app combines historical data visualization with machine learning predictions to estimate water levels at both monitored and unmonitored locations.
@@ -111,16 +113,23 @@ Navigate to `http://localhost:8050`
 well-dash/
 ├── app.py                          # Main application entry point
 ├── wellapp/
+│   ├── __init__.py 
 │   ├── callbacks.py                # Dash callback functions
 │   ├── utils.py                    # Utility functions (data loading, plotting)
 │   └── layout.py                   # Layout of web page                
 ├── models/
 │   ├── wl_xgb_model_basin.bin     # Trained XGBoost model
 │   ├── station_encoder.joblib     # Station ID encoder
+|   ├── predictions_cache.pkl      # Pre-calculated Predictions
 │   └── basin_encoder.joblib       # Basin name encoder
+├── training/
+│   ├── gw_levels.ipynb             # Notebook for ML training 
+│   ├── precompute_predictions.py   # Script to generate predictions_cache.pkl 
+│   └── utils.py                    # Utility functions for notebook
 ├── requirements.txt                # Python dependencies
 ├── LICENSE                         # License file
 ├── pyproject.toml                  # Set up file
+├── plotly-cloud.toml               # Plotly set up file
 ├── .gitignore                      # git ignore file  
 └── README.md                       # This file
 ```
@@ -174,7 +183,7 @@ The XGBoost model was trained using:
 
 ## 🌐 Deployment
 
-### Deploy to Render.com (Free)
+### Deploy to Plotly Cloud (Free)
 
 1. **Create `Procfile`:**
 ```
