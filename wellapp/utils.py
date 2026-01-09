@@ -1006,7 +1006,7 @@ def add_to_stl(fig_trend, fig_seasonal, fig_resid, dates_trend, predictions_tren
         y=seasonal_component,
         mode='lines',
         name=f'{name} Seasonal',
-        line=dict(color=color, dash='dash'),
+        line=dict(color=color),
         hovertemplate="%{y:.2f} ft"
     ))
     
@@ -1016,6 +1016,6 @@ def add_to_stl(fig_trend, fig_seasonal, fig_resid, dates_trend, predictions_tren
         y=resid_component,
         mode='lines',
         name=f'{name} Residual',
-        line=dict(color=color, dash='dash'),
+        line=dict(color=color),
         hovertemplate="%{y:.2f} ft"
     ))
